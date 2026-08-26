@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: ae4da2af7f49c1240be60a1ed240894d
+guid: f6dd28afe7526d343989e9ce64dce4c5
 TextureImporter:
   internalIDToNameTable:
   - first:
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 0
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
+    textureCompression: 1
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -116,10 +116,10 @@ TextureImporter:
       name: 003_0
       rect:
         serializedVersion: 2
-        x: 7
-        y: 0
-        width: 371
-        height: 124
+        x: 11
+        y: 19
+        width: 78
+        height: 262
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
