@@ -1,11 +1,14 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 [DefaultExecutionOrder(-100)]
 public class Bag : MonoBehaviour
 {
     [SerializeField] private int size = 8;
-    [SerializeField] private int inactiveBorderLines = 2;
+    [SerializeField, FormerlySerializedAs("inactiveBorderLines")]
+    private int inactiveVerticalBorderLines = 2;
+    [SerializeField] private int inactiveHorizontalBorderLines = 2;
     [SerializeField] private Slot slotPrefab;
     [SerializeField] private float gridLineThickness = 2f;
     [SerializeField] private Color gridLineColor = new Color(0.2f, 0.2f, 0.2f, 0.8f);
@@ -125,11 +128,13 @@ public class Bag : MonoBehaviour
 
     private bool IsInsideActiveRegion(int row, int col)
     {
-        int border = Mathf.Max(0, inactiveBorderLines);
-        if (size <= border * 2) return false;
+        int verticalBorder = Mathf.Max(0, inactiveVerticalBorderLines);
+        int horizontalBorder = Mathf.Max(0, inactiveHorizontalBorderLines);
+        if (size <= verticalBorder * 2) return false;
+        if (size <= horizontalBorder * 2) return false;
 
-        return row >= border && row < size - border
-            && col >= border && col < size - border;
+        return row >= verticalBorder && row < size - verticalBorder
+            && col >= horizontalBorder && col < size - horizontalBorder;
     }
 
     private void CreateGridLines()

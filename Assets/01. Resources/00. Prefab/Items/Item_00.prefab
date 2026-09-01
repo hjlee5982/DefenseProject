@@ -137,8 +137,9 @@ MonoBehaviour:
   - {r: 0.85, g: 0.7, b: 1, a: 1}
   - {r: 1, g: 0.85, b: 0.6, a: 1}
   - {r: 1, g: 0.7, b: 0.75, a: 1}
-  projectilePrefab: {fileID: 5100000001, guid: 5965611a05abb554fbb13cead105eca0, type: 3}
-  icon: {fileID: 21300000, guid: 845f19b8f1903cd41b0a16e2213c7cfc, type: 3}
+  projectilePrefab: {fileID: 0}
+  instantAttackPrefab: {fileID: 0}
+  icon: {fileID: 0}
   iconColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &3617158224606039103
 GameObject:

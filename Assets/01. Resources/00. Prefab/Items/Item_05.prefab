@@ -206,7 +206,7 @@ MonoBehaviour:
   rotateDuration: 0.15
   cellSize: 100
   disableRotation: 1
-  category: 0
+  category: 1
   grade: 1
   gradeColors:
   - {r: 0.564, g: 1, b: 0.561, a: 1}
@@ -214,9 +214,10 @@ MonoBehaviour:
   - {r: 0.85, g: 0.7, b: 1, a: 1}
   - {r: 1, g: 0.85, b: 0.6, a: 1}
   - {r: 1, g: 0.7, b: 0.75, a: 1}
-  projectilePrefab: {fileID: 5100000001, guid: b4fa42b8dd8ab34458439747c71b9a7f, type: 3}
-  icon: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
-  iconColor: {r: 1, g: 0.25, b: 0.25, a: 1}
+  projectilePrefab: {fileID: 0}
+  instantAttackPrefab: {fileID: 0}
+  icon: {fileID: 0}
+  iconColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &3149454014100159113
 GameObject:
   m_ObjectHideFlags: 0

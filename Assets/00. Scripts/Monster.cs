@@ -12,7 +12,7 @@ public class Monster : MonoBehaviour
     private int hp;
     private int reservedDamage;
     private bool isDead;
-    private readonly Dictionary<Projectile, int> reservations = new();
+    private readonly Dictionary<MonoBehaviour, int> reservations = new();
 
     public int Hp => hp;
     public int ReservedDamage => reservedDamage;
@@ -29,34 +29,34 @@ public class Monster : MonoBehaviour
         transform.Translate(Vector3.down * moveSpeed * Time.deltaTime);
     }
 
-    public bool TryReserve(Projectile projectile, int amount)
+    public bool TryReserve(MonoBehaviour source, int amount)
     {
-        if (isDead || projectile == null || amount <= 0) return false;
+        if (isDead || source == null || amount <= 0) return false;
         if (hp <= 0 || ExpectedRemainingHp <= 0) return false;
-        if (reservations.ContainsKey(projectile)) return false;
+        if (reservations.ContainsKey(source)) return false;
 
-        reservations.Add(projectile, amount);
+        reservations.Add(source, amount);
         reservedDamage += amount;
         return true;
     }
 
-    public bool TryApplyReservedHit(Projectile projectile)
+    public bool TryApplyReservedHit(MonoBehaviour source)
     {
-        if (!TryConsumeReservation(projectile, out int amount)) return false;
+        if (!TryConsumeReservation(source, out int amount)) return false;
         TakeDamage(amount);
         return true;
     }
 
-    public void ReleaseReservation(Projectile projectile)
+    public void ReleaseReservation(MonoBehaviour source)
     {
-        TryConsumeReservation(projectile, out _);
+        TryConsumeReservation(source, out _);
     }
 
-    private bool TryConsumeReservation(Projectile projectile, out int amount)
+    private bool TryConsumeReservation(MonoBehaviour source, out int amount)
     {
         amount = 0;
-        if (projectile == null) return false;
-        if (!reservations.Remove(projectile, out amount)) return false;
+        if (source == null) return false;
+        if (!reservations.Remove(source, out amount)) return false;
 
         reservedDamage = Mathf.Max(0, reservedDamage - amount);
         return true;
@@ -94,11 +94,16 @@ public class Monster : MonoBehaviour
         if (reservations.Count == 0) return;
 
         Projectile[] pending = new Projectile[reservations.Count];
-        reservations.Keys.CopyTo(pending, 0);
+        int count = 0;
+        foreach (MonoBehaviour source in reservations.Keys)
+        {
+            if (source is Projectile projectile)
+                pending[count++] = projectile;
+        }
         reservations.Clear();
         reservedDamage = 0;
 
-        for (int i = 0; i < pending.Length; i++)
+        for (int i = 0; i < count; i++)
         {
             if (pending[i] != null)
                 pending[i].OnTargetLost();

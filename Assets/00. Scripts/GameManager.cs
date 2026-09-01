@@ -61,6 +61,8 @@ public class GameManager : MonoBehaviour
         {
             if (inventoryManager.RemainingExpansionCount > 0) return;
 
+            inventoryManager.ApplyBagExpansion();
+
             if (isInitialExpansionPhase)
             {
                 isInitialExpansionPhase = false;

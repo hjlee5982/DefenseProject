@@ -3,55 +3,103 @@ using UnityEngine;
 
 public class PlayerShooter : MonoBehaviour
 {
-    [SerializeField] private Projectile[] projectilePrefabs;
-
-    private float[] fireTimers;
-
-    private void Awake()
+    private struct EquippedWeapon
     {
-        RebuildTimers();
+        public int equipSlotIndex;
+        public float fireInterval;
+        public float range;
+        public Projectile projectilePrefab;
+        public InstantAttack instantAttackPrefab;
     }
+
+    [SerializeField] private EquipSlotView equipSlotView;
+
+    private EquippedWeapon[] weapons;
+    private float[] fireTimers;
 
     public void SetEquippedProjectiles(IReadOnlyList<Item> items)
     {
-        List<Projectile> projectiles = new();
+        List<EquippedWeapon> equippedWeapons = new();
+
         for (int i = 0; i < items.Count; i++)
         {
-            Projectile projectile = items[i].ProjectilePrefab;
-            if (projectile != null) projectiles.Add(projectile);
+            Item item = items[i];
+            if (item.IsProjectileWeapon)
+            {
+                Projectile projectile = item.ProjectilePrefab;
+                if (projectile == null) continue;
+
+                equippedWeapons.Add(new EquippedWeapon
+                {
+                    equipSlotIndex = i,
+                    fireInterval = projectile.FireInterval,
+                    range = projectile.Range,
+                    projectilePrefab = projectile
+                });
+            }
+            else if (item.IsInstantWeapon)
+            {
+                InstantAttack instantAttack = item.InstantAttackPrefab;
+                if (instantAttack == null) continue;
+
+                equippedWeapons.Add(new EquippedWeapon
+                {
+                    equipSlotIndex = i,
+                    fireInterval = instantAttack.FireInterval,
+                    range = instantAttack.Range,
+                    instantAttackPrefab = instantAttack
+                });
+            }
         }
 
-        projectilePrefabs = projectiles.ToArray();
-        RebuildTimers();
+        weapons = equippedWeapons.ToArray();
+        fireTimers = new float[weapons.Length];
     }
 
     private void Update()
     {
-        for (int i = 0; i < projectilePrefabs.Length; i++)
+        if (weapons == null) return;
+
+        for (int i = 0; i < weapons.Length; i++)
         {
-            Projectile prefab = projectilePrefabs[i];
-            if (prefab == null) continue;
-
+            EquippedWeapon weapon = weapons[i];
             fireTimers[i] += Time.deltaTime;
-            if (fireTimers[i] < prefab.FireInterval) continue;
+            if (fireTimers[i] < weapon.fireInterval) continue;
 
-            Monster target = FindNearestMonsterInRange(prefab.Range);
+            Monster target = FindNearestMonsterInRange(weapon.range);
             if (target == null) continue;
 
-            Projectile projectile = Instantiate(prefab, transform.position, Quaternion.identity);
-            if (!projectile.Init(target))
-            {
-                Destroy(projectile.gameObject);
-                continue;
-            }
+            if (!TryFire(weapon, target)) continue;
 
             fireTimers[i] = 0f;
+            if (equipSlotView != null)
+                equipSlotView.StartCooldown(weapon.equipSlotIndex, weapon.fireInterval);
         }
     }
 
-    private void RebuildTimers()
+    private bool TryFire(EquippedWeapon weapon, Monster target)
     {
-        fireTimers = new float[projectilePrefabs != null ? projectilePrefabs.Length : 0];
+        if (weapon.projectilePrefab != null)
+        {
+            Projectile projectile = Instantiate(weapon.projectilePrefab, transform.position, Quaternion.identity);
+            if (projectile.Init(target))
+                return true;
+
+            Destroy(projectile.gameObject);
+            return false;
+        }
+
+        if (weapon.instantAttackPrefab != null)
+        {
+            InstantAttack attack = Instantiate(weapon.instantAttackPrefab, transform.position, Quaternion.identity);
+            if (attack.Init(target, transform.position))
+                return true;
+
+            Destroy(attack.gameObject);
+            return false;
+        }
+
+        return false;
     }
 
     private Monster FindNearestMonsterInRange(float range)

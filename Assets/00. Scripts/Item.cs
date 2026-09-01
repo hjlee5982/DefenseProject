@@ -7,12 +7,17 @@ using UnityEngine.UI;
 
 public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
-    public enum ItemCategory { Weapon, Buff }
+    public enum ItemCategory
+    {
+        WeaponProjectile,
+        Buff,
+        WeaponInstant
+    }
 
     [SerializeField] private float rotateDuration = 0.15f;
     [SerializeField] private float cellSize = 100f;
     [SerializeField] private bool disableRotation;
-    [SerializeField] private ItemCategory category = ItemCategory.Weapon;
+    [SerializeField] private ItemCategory category = ItemCategory.WeaponProjectile;
     [SerializeField] private int grade = 1;
     [SerializeField] private Color[] gradeColors =
     {
@@ -23,6 +28,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         new Color(1f, 0.7f, 0.75f, 1f)
     };
     [SerializeField] private Projectile projectilePrefab;
+    [SerializeField] private InstantAttack instantAttackPrefab;
     [SerializeField] private Sprite icon;
     [SerializeField] private Color iconColor = Color.white;
 
@@ -50,14 +56,17 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     private float dragStartTargetAngleZ;
 
     public Projectile ProjectilePrefab => projectilePrefab;
+    public InstantAttack InstantAttackPrefab => instantAttackPrefab;
     public Sprite Icon => icon;
     public Color IconColor => iconColor;
     public int Grade => grade;
     public int MaxGrade => gradeColors != null && gradeColors.Length > 0 ? gradeColors.Length : 1;
     public string ShopBanKey => GetTypeKey();
     public ItemCategory Category => category;
-    public bool IsWeapon => category == ItemCategory.Weapon;
     public bool IsBuff => category == ItemCategory.Buff;
+    public bool IsWeapon => category == ItemCategory.WeaponProjectile || category == ItemCategory.WeaponInstant;
+    public bool IsProjectileWeapon => category == ItemCategory.WeaponProjectile;
+    public bool IsInstantWeapon => category == ItemCategory.WeaponInstant;
 
     private void Awake()
     {

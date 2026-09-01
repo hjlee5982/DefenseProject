@@ -6,12 +6,20 @@ using UnityEngine.UI;
 
 public class InventoryManager : MonoBehaviour
 {
+    [System.Serializable]
+    private class ItemPrefabSpawnEntry
+    {
+        public Item prefab;
+        public bool spawnEnabled = true;
+    }
+
     [SerializeField] public Bag Bag;
     [SerializeField] public GameObject Shop;
     [SerializeField] private GameObject clearPanel;
     [SerializeField] private GameObject expansionPanel;
     [SerializeField] private TextMeshProUGUI expansionCountText;
-    [SerializeField] private Item[] itemPrefabs;
+    [Header("Item Prefabs")]
+    [SerializeField] private ItemPrefabSpawnEntry[] itemPrefabs;
 
     [Header("Shop Grade Probabilities (합계 100%)")]
     [Tooltip("1단계 아이템이 등장할 확률 (%)")]
@@ -30,7 +38,8 @@ public class InventoryManager : MonoBehaviour
     private bool[] previewStates;
     private bool previewValid;
     private PreparePhaseMode preparePhaseMode;
-    private int remainingExpansionCount;
+    private int requiredExpansionCount;
+    private readonly HashSet<Slot> selectedExpansionSlots = new();
     private readonly HashSet<string> bannedShopKeys = new();
     private readonly HashSet<int> previewIndices = new();
     private readonly List<int> placementIndices = new();
@@ -42,7 +51,7 @@ public class InventoryManager : MonoBehaviour
     public bool IsClearPrepareMode => preparePhaseMode == PreparePhaseMode.ItemCompress;
     public bool IsExpansionPrepareMode => preparePhaseMode == PreparePhaseMode.BagExpansion;
     public bool CanExpandBag => Bag.HasLockedSlots();
-    public int RemainingExpansionCount => remainingExpansionCount;
+    public int RemainingExpansionCount => Mathf.Max(0, requiredExpansionCount - selectedExpansionSlots.Count);
 
     public event System.Action ExpansionStateChanged;
 
@@ -57,6 +66,17 @@ public class InventoryManager : MonoBehaviour
         }
 
         return items;
+    }
+
+    private void OnValidate()
+    {
+        if (itemPrefabs == null) return;
+
+        for (int i = 0; i < itemPrefabs.Length; i++)
+        {
+            if (itemPrefabs[i] == null)
+                itemPrefabs[i] = new ItemPrefabSpawnEntry();
+        }
     }
 
     private void Awake()
@@ -144,7 +164,8 @@ public class InventoryManager : MonoBehaviour
 
         if (mode == PreparePhaseMode.BagExpansion)
         {
-            remainingExpansionCount = Mathf.Max(0, expansionUnlockCount);
+            requiredExpansionCount = Mathf.Max(0, expansionUnlockCount);
+            ClearExpansionSelections();
             Bag.SetExpandableOnLockedSlots(true);
             UpdateExpansionCountText();
             ExpansionStateChanged?.Invoke();
@@ -154,6 +175,7 @@ public class InventoryManager : MonoBehaviour
     public void ExitSpecialPreparePhase()
     {
         preparePhaseMode = PreparePhaseMode.Normal;
+        ClearExpansionSelections();
         Bag.SetExpandableOnLockedSlots(false);
 
         if (clearPanel != null) clearPanel.SetActive(false);
@@ -161,29 +183,60 @@ public class InventoryManager : MonoBehaviour
         Shop.SetActive(true);
     }
 
-    public bool TryExpandSlot(Slot slot)
+    public bool TryToggleExpansionSelection(Slot slot)
     {
         if (preparePhaseMode != PreparePhaseMode.BagExpansion) return false;
-        if (remainingExpansionCount <= 0) return false;
         if (slot == null || !slot.IsLocked || !slot.IsExpandable) return false;
 
-        slot.Unlock();
-        remainingExpansionCount--;
-        if (remainingExpansionCount <= 0)
+        if (slot.IsExpansionSelected)
         {
-            Bag.SetExpandableOnLockedSlots(false);
+            slot.SetExpansionSelected(false);
+            selectedExpansionSlots.Remove(slot);
+            UpdateExpansionCountText();
+            ExpansionStateChanged?.Invoke();
+            return true;
         }
 
+        if (selectedExpansionSlots.Count >= requiredExpansionCount) return false;
+
+        slot.SetExpansionSelected(true);
+        selectedExpansionSlots.Add(slot);
         UpdateExpansionCountText();
         ExpansionStateChanged?.Invoke();
         return true;
+    }
+
+    public void ApplyBagExpansion()
+    {
+        if (preparePhaseMode != PreparePhaseMode.BagExpansion) return;
+        if (selectedExpansionSlots.Count < requiredExpansionCount) return;
+
+        foreach (Slot slot in selectedExpansionSlots)
+        {
+            slot.Unlock();
+        }
+
+        selectedExpansionSlots.Clear();
+        Bag.SetExpandableOnLockedSlots(false);
+        UpdateExpansionCountText();
+        ExpansionStateChanged?.Invoke();
+    }
+
+    private void ClearExpansionSelections()
+    {
+        foreach (Slot slot in selectedExpansionSlots)
+        {
+            slot.SetExpansionSelected(false);
+        }
+
+        selectedExpansionSlots.Clear();
     }
 
     private void UpdateExpansionCountText()
     {
         ResolveExpansionCountText();
         if (expansionCountText == null) return;
-        expansionCountText.text = $"확장 가능 칸 수 : {remainingExpansionCount}";
+        expansionCountText.text = $"확장 가능 칸 수 : {RemainingExpansionCount}";
     }
 
     public void ApplyClearBans()
@@ -242,11 +295,12 @@ public class InventoryManager : MonoBehaviour
         List<Item> allowed = new();
         for (int i = 0; i < itemPrefabs.Length; i++)
         {
-            Item prefab = itemPrefabs[i];
-            if (prefab == null) continue;
-            if (bannedShopKeys.Contains(prefab.ShopBanKey)) continue;
-            if (weaponOnly && !prefab.IsWeapon) continue;
-            allowed.Add(prefab);
+            ItemPrefabSpawnEntry entry = itemPrefabs[i];
+            if (entry == null || entry.prefab == null) continue;
+            if (!entry.spawnEnabled) continue;
+            if (bannedShopKeys.Contains(entry.prefab.ShopBanKey)) continue;
+            if (weaponOnly && !entry.prefab.IsWeapon) continue;
+            allowed.Add(entry.prefab);
         }
 
         if (allowed.Count == 0) return null;

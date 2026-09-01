@@ -59,6 +59,23 @@ public class Effector : MonoBehaviour
         animator.Play(MoveStateName, 0, 0f);
     }
 
+    public void PlayOnce()
+    {
+        if (useAnimator)
+        {
+            PlayEnd();
+            return;
+        }
+
+        if (sprites == null || sprites.Length == 0) return;
+
+        elapsed = 0f;
+        playing = true;
+        loop = false;
+        destroyWhenFinished = true;
+        ApplySprite(0);
+    }
+
     public void PlayEnd()
     {
         if (ending) return;

@@ -12,15 +12,18 @@ public class Slot : MonoBehaviour, IPointerClickHandler
     private Image image;
     private GameObject lockDisplay;
     private GameObject plusDisplay;
+    private GameObject plusGreenDisplay;
     private InventoryManager inventoryManager;
     private bool isLocked;
     private bool isExpandable;
+    private bool isExpansionSelected;
     public bool isActivated = true;
 
     public RectTransform RectTransform { get; private set; }
     public bool IsActivated => isActivated;
     public bool IsLocked => isLocked;
     public bool IsExpandable => isExpandable;
+    public bool IsExpansionSelected => isExpansionSelected;
 
     private void Awake()
     {
@@ -42,8 +45,16 @@ public class Slot : MonoBehaviour, IPointerClickHandler
             DisableRaycast(plusTransform);
         }
 
+        Transform plusGreenTransform = transform.Find("Plus_Green");
+        if (plusGreenTransform != null)
+        {
+            plusGreenDisplay = plusGreenTransform.gameObject;
+            DisableRaycast(plusGreenTransform);
+        }
+
         ApplyLockVisibility();
         ApplyPlusVisibility();
+        ApplyPlusGreenVisibility();
         ApplyBaseColor();
     }
 
@@ -57,6 +68,7 @@ public class Slot : MonoBehaviour, IPointerClickHandler
 
         ApplyLockVisibility();
         ApplyPlusVisibility();
+        ApplyPlusGreenVisibility();
     }
 
     public void SetExpandable(bool expandable)
@@ -64,11 +76,18 @@ public class Slot : MonoBehaviour, IPointerClickHandler
         if (!isLocked)
         {
             isExpandable = false;
+            SetExpansionSelected(false);
             ApplyPlusVisibility();
+            ApplyPlusGreenVisibility();
             return;
         }
 
         isExpandable = expandable;
+        if (!expandable)
+        {
+            SetExpansionSelected(false);
+        }
+
         if (image != null)
         {
             image.raycastTarget = isLocked;
@@ -76,15 +95,31 @@ public class Slot : MonoBehaviour, IPointerClickHandler
 
         ApplyLockVisibility();
         ApplyPlusVisibility();
+        ApplyPlusGreenVisibility();
+    }
+
+    public void SetExpansionSelected(bool selected)
+    {
+        if (!isLocked || !isExpandable)
+        {
+            selected = false;
+        }
+
+        isExpansionSelected = selected;
+        ApplyPlusVisibility();
+        ApplyPlusGreenVisibility();
+        ApplyBaseColor();
     }
 
     public void Unlock()
     {
         isLocked = false;
         isExpandable = false;
+        isExpansionSelected = false;
         isActivated = true;
         ApplyLockVisibility();
         ApplyPlusVisibility();
+        ApplyPlusGreenVisibility();
         ApplyBaseColor();
     }
 
@@ -113,12 +148,26 @@ public class Slot : MonoBehaviour, IPointerClickHandler
         }
 
         if (inventoryManager == null) return;
-        inventoryManager.TryExpandSlot(this);
+        inventoryManager.TryToggleExpansionSelection(this);
     }
 
     private void ApplyBaseColor()
     {
         image.color = isActivated ? DefaultColor : DeactivatedColor;
+    }
+
+    private void ApplyPlusGreenVisibility()
+    {
+        if (plusGreenDisplay == null) return;
+
+        bool showPlusGreen = isLocked && isExpandable && isExpansionSelected;
+        plusGreenDisplay.SetActive(showPlusGreen);
+
+        Image plusGreenImage = plusGreenDisplay.GetComponent<Image>();
+        if (plusGreenImage != null)
+        {
+            plusGreenImage.enabled = showPlusGreen;
+        }
     }
 
     private void ApplyLockVisibility()
@@ -139,7 +188,7 @@ public class Slot : MonoBehaviour, IPointerClickHandler
     {
         if (plusDisplay == null) return;
 
-        bool showPlus = isLocked && isExpandable;
+        bool showPlus = isLocked && isExpandable && !isExpansionSelected;
         plusDisplay.SetActive(showPlus);
 
         Image plusImage = plusDisplay.GetComponent<Image>();
