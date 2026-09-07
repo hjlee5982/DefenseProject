@@ -15,6 +15,8 @@ public class InventoryManager : MonoBehaviour
 
     [SerializeField] public Bag Bag;
     [SerializeField] public GameObject Shop;
+    [SerializeField] private Button shopRerollButton;
+    [SerializeField] private Button shopCompressButton;
     [SerializeField] private GameObject clearPanel;
     [SerializeField] private GameObject expansionPanel;
     [SerializeField] private TextMeshProUGUI expansionCountText;
@@ -83,16 +85,87 @@ public class InventoryManager : MonoBehaviour
     {
         previewStates = new bool[Bag.Slots.Length];
 
-        shopSlots = new RectTransform[Shop.transform.childCount];
-        for (int i = 0; i < Shop.transform.childCount; i++)
-        {
-            shopSlots[i] = Shop.transform.GetChild(i) as RectTransform;
-        }
-
+        CacheShopSlots();
         CacheClearSlots();
         ResolveExpansionCountText();
+        BindShopRerollButton();
+        BindShopCompressButton();
+        UpdateShopActionButtons();
 
         SpawnShopItems();
+    }
+
+    private void OnDestroy()
+    {
+        if (shopRerollButton != null)
+            shopRerollButton.onClick.RemoveListener(OnShopRerollClicked);
+        if (shopCompressButton != null)
+            shopCompressButton.onClick.RemoveListener(OnShopCompressClicked);
+    }
+
+    private void BindShopRerollButton()
+    {
+        if (shopRerollButton == null && Shop != null)
+        {
+            Transform found = Shop.transform.Find("Reroll");
+            if (found != null)
+                shopRerollButton = found.GetComponent<Button>();
+        }
+
+        if (shopRerollButton == null) return;
+        shopRerollButton.onClick.AddListener(OnShopRerollClicked);
+    }
+
+    private void BindShopCompressButton()
+    {
+        if (shopCompressButton == null && Shop != null)
+        {
+            Transform found = Shop.transform.Find("Compress");
+            if (found != null)
+                shopCompressButton = found.GetComponent<Button>();
+        }
+
+        if (shopCompressButton == null) return;
+        shopCompressButton.onClick.AddListener(OnShopCompressClicked);
+    }
+
+    private void OnShopRerollClicked()
+    {
+        if (preparePhaseMode == PreparePhaseMode.BagExpansion) return;
+        RefreshShop();
+    }
+
+    private void OnShopCompressClicked()
+    {
+        if (preparePhaseMode != PreparePhaseMode.Normal) return;
+        EnterPreparePhase(PreparePhaseMode.ItemCompress);
+    }
+
+    private void UpdateShopActionButtons()
+    {
+        bool canCompress = preparePhaseMode == PreparePhaseMode.Normal;
+        if (shopCompressButton != null)
+            shopCompressButton.interactable = canCompress;
+
+        bool canReroll = preparePhaseMode != PreparePhaseMode.BagExpansion;
+        if (shopRerollButton != null)
+            shopRerollButton.interactable = canReroll;
+    }
+
+    private void CacheShopSlots()
+    {
+        List<RectTransform> slots = new();
+        for (int i = 0; i < Shop.transform.childCount; i++)
+        {
+            Transform child = Shop.transform.GetChild(i);
+            if (child.GetComponent<Button>() != null) continue;
+
+            RectTransform rect = child as RectTransform;
+            if (rect == null) continue;
+            slots.Add(rect);
+        }
+
+        shopSlots = slots.ToArray();
     }
 
     private void ResolveExpansionCountText()
@@ -170,6 +243,8 @@ public class InventoryManager : MonoBehaviour
             UpdateExpansionCountText();
             ExpansionStateChanged?.Invoke();
         }
+
+        UpdateShopActionButtons();
     }
 
     public void ExitSpecialPreparePhase()
@@ -177,10 +252,12 @@ public class InventoryManager : MonoBehaviour
         preparePhaseMode = PreparePhaseMode.Normal;
         ClearExpansionSelections();
         Bag.SetExpandableOnLockedSlots(false);
+        Bag.gameObject.SetActive(true);
 
         if (clearPanel != null) clearPanel.SetActive(false);
         ConfigureExpansionPanel(false);
         Shop.SetActive(true);
+        UpdateShopActionButtons();
     }
 
     public bool TryToggleExpansionSelection(Slot slot)
@@ -271,7 +348,7 @@ public class InventoryManager : MonoBehaviour
         }
     }
 
-    public void RefreshShop(bool weaponOnly = false)
+    public void RefreshShop(bool weaponOnly = false, bool ensureAtLeastOneWeapon = false)
     {
         if (itemPrefabs == null || itemPrefabs.Length == 0) return;
 
@@ -286,6 +363,40 @@ public class InventoryManager : MonoBehaviour
             Item item = Instantiate(prefab, shopSlot);
             item.PlaceOnShop(shopSlot);
         }
+
+        if (ensureAtLeastOneWeapon && !weaponOnly)
+            EnsureShopHasWeapon();
+    }
+
+    private void EnsureShopHasWeapon()
+    {
+        if (ShopHasWeapon()) return;
+
+        Item weaponPrefab = PickRandomShopPrefab(weaponOnly: true);
+        if (weaponPrefab == null || shopSlots.Length == 0) return;
+
+        int index = Random.Range(0, shopSlots.Length);
+        RectTransform shopSlot = shopSlots[index];
+        RemoveShopItemsFromSlot(shopSlot, immediate: true);
+
+        Item item = Instantiate(weaponPrefab, shopSlot);
+        item.PlaceOnShop(shopSlot);
+    }
+
+    private bool ShopHasWeapon()
+    {
+        for (int i = 0; i < shopSlots.Length; i++)
+        {
+            RectTransform shopSlot = shopSlots[i];
+            for (int childIndex = 0; childIndex < shopSlot.childCount; childIndex++)
+            {
+                Item item = shopSlot.GetChild(childIndex).GetComponent<Item>();
+                if (item != null && item.IsWeapon)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private Item PickRandomShopPrefab(bool weaponOnly = false)

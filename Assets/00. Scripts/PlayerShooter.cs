@@ -20,10 +20,13 @@ public class PlayerShooter : MonoBehaviour
     public void SetEquippedProjectiles(IReadOnlyList<Item> items)
     {
         List<EquippedWeapon> equippedWeapons = new();
+        int equipSlotIndex = 0;
 
         for (int i = 0; i < items.Count; i++)
         {
             Item item = items[i];
+            if (item == null || !item.IsWeapon) continue;
+
             if (item.IsProjectileWeapon)
             {
                 Projectile projectile = item.ProjectilePrefab;
@@ -31,11 +34,12 @@ public class PlayerShooter : MonoBehaviour
 
                 equippedWeapons.Add(new EquippedWeapon
                 {
-                    equipSlotIndex = i,
+                    equipSlotIndex = equipSlotIndex,
                     fireInterval = projectile.FireInterval,
                     range = projectile.Range,
                     projectilePrefab = projectile
                 });
+                equipSlotIndex++;
             }
             else if (item.IsInstantWeapon)
             {
@@ -44,11 +48,12 @@ public class PlayerShooter : MonoBehaviour
 
                 equippedWeapons.Add(new EquippedWeapon
                 {
-                    equipSlotIndex = i,
+                    equipSlotIndex = equipSlotIndex,
                     fireInterval = instantAttack.FireInterval,
                     range = instantAttack.Range,
                     instantAttackPrefab = instantAttack
                 });
+                equipSlotIndex++;
             }
         }
 

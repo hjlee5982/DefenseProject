@@ -11,6 +11,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject uiBackground;
     [SerializeField] private GameObject roundPanel;
     [SerializeField] private TextMeshProUGUI roundText;
+    [SerializeField] private GameObject goldPanel;
     [SerializeField] private EquipSlotView equipSlot;
     [SerializeField] private Spawner spawner;
     [SerializeField] private PlayerShooter playerShooter;
@@ -28,7 +29,8 @@ public class GameManager : MonoBehaviour
         spawner.enabled = false;
         playerShooter.enabled = false;
         equipSlot.gameObject.SetActive(false);
-        if (roundPanel != null) roundPanel.SetActive(false);
+        ResolveGoldPanel();
+        SetCombatHudActive(false);
 
         nextButtonComponent = nextButton.GetComponent<Button>();
         nextButtonComponent.onClick.AddListener(OnNextClicked);
@@ -67,7 +69,7 @@ public class GameManager : MonoBehaviour
             {
                 isInitialExpansionPhase = false;
                 inventoryManager.ExitSpecialPreparePhase();
-                inventoryManager.RefreshShop();
+                inventoryManager.RefreshShop(ensureAtLeastOneWeapon: true);
                 UpdateNextButtonState();
                 return;
             }
@@ -121,7 +123,7 @@ public class GameManager : MonoBehaviour
         ClearProjectiles();
 
         equipSlot.gameObject.SetActive(false);
-        if (roundPanel != null) roundPanel.SetActive(false);
+        SetCombatHudActive(false);
         inventoryManager.gameObject.SetActive(true);
         nextButton.SetActive(true);
         uiBackground.SetActive(true);
@@ -153,7 +155,7 @@ public class GameManager : MonoBehaviour
 
         if (prepareMode != PreparePhaseMode.BagExpansion)
         {
-            inventoryManager.RefreshShop(weaponOnly: true);
+            inventoryManager.RefreshShop(ensureAtLeastOneWeapon: true);
         }
 
         UpdateNextButtonState();
@@ -192,24 +194,33 @@ public class GameManager : MonoBehaviour
             return PreparePhaseMode.BagExpansion;
         }
 
-        if (roundEventScheduler.ShouldShowItemCompress(clearedRoundCount))
-        {
-            return PreparePhaseMode.ItemCompress;
-        }
-
         return PreparePhaseMode.Normal;
     }
 
     private void ShowRound(int round)
     {
-        if (roundPanel == null) return;
-
         if (roundText != null)
         {
             roundText.text = round.ToString();
         }
 
-        roundPanel.SetActive(true);
+        SetCombatHudActive(true);
+    }
+
+    private void ResolveGoldPanel()
+    {
+        if (goldPanel != null) return;
+        if (roundPanel == null || roundPanel.transform.parent == null) return;
+
+        Transform found = roundPanel.transform.parent.Find("Gold");
+        if (found != null)
+            goldPanel = found.gameObject;
+    }
+
+    private void SetCombatHudActive(bool active)
+    {
+        if (roundPanel != null) roundPanel.SetActive(active);
+        if (goldPanel != null) goldPanel.SetActive(active);
     }
 
     private void SubscribeCombatEvents()

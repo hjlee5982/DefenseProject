@@ -46,9 +46,39 @@ public class EquipSlotView : MonoBehaviour
     {
         InitializeSlots();
 
-        for (int i = 0; i < slots.Length; i++)
+        int slotIndex = 0;
+        for (int i = 0; i < items.Count && slotIndex < slots.Length; i++)
         {
-            SlotState slot = slots[i];
+            Item item = items[i];
+            if (item == null || !item.IsWeapon) continue;
+            if (item.IsProjectileWeapon && item.ProjectilePrefab == null) continue;
+            if (item.IsInstantWeapon && item.InstantAttackPrefab == null) continue;
+
+            SlotState slot = slots[slotIndex];
+            if (slot.icon == null)
+            {
+                slotIndex++;
+                continue;
+            }
+
+            slot.cooldownRemaining = 0f;
+            slot.cooldownDuration = 0f;
+            if (slot.cooldownOverlay != null)
+            {
+                slot.cooldownOverlay.fillAmount = 0f;
+                slot.cooldownOverlay.enabled = false;
+            }
+
+            slot.icon.sprite = item.Icon;
+            slot.icon.color = item.IconColor;
+            slot.icon.enabled = item.Icon != null;
+            UpdateOverlaySprite(slot);
+            slotIndex++;
+        }
+
+        for (; slotIndex < slots.Length; slotIndex++)
+        {
+            SlotState slot = slots[slotIndex];
             if (slot.icon == null) continue;
 
             slot.cooldownRemaining = 0f;
@@ -59,20 +89,9 @@ public class EquipSlotView : MonoBehaviour
                 slot.cooldownOverlay.enabled = false;
             }
 
-            if (i < items.Count)
-            {
-                Item item = items[i];
-                slot.icon.sprite = item.Icon;
-                slot.icon.color = item.IconColor;
-                slot.icon.enabled = item.Icon != null;
-                UpdateOverlaySprite(slot);
-            }
-            else
-            {
-                slot.icon.sprite = null;
-                slot.icon.color = Color.white;
-                slot.icon.enabled = false;
-            }
+            slot.icon.sprite = null;
+            slot.icon.color = Color.white;
+            slot.icon.enabled = false;
         }
     }
 

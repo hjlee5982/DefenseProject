@@ -7,9 +7,8 @@ public class InstantAttack : MonoBehaviour
     [SerializeField] private int damage = 1;
     [SerializeField] private Effector effectPrefab;
     [SerializeField] private bool showGuideline = true;
-    [SerializeField] private float guidelineDuration = 0.2f;
-    [SerializeField] private float guidelineWidth = 0.08f;
-    [SerializeField] private Color guidelineColor = new Color(1f, 0.9f, 0.2f, 0.9f);
+    [SerializeField] private Effector guidelinePrefab;
+    [SerializeField] private float guidelineRotationOffset;
 
     private bool reservationConsumed;
     private Monster target;
@@ -28,7 +27,7 @@ public class InstantAttack : MonoBehaviour
 
         Vector3 hitPosition = target.transform.position;
         if (showGuideline)
-            AttackGuideline.Show(origin, hitPosition, guidelineWidth, guidelineColor, guidelineDuration);
+            AttackGuideline.Show(guidelinePrefab, origin, hitPosition, guidelineRotationOffset);
 
         SpawnEffect(hitPosition);
 

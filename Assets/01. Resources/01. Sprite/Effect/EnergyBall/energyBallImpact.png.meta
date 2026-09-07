@@ -1,0 +1,431 @@
+fileFormatVersion: 2
+guid: 427f0bc9c0e5e2648a29e49128255fff
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -2285897067133534271
+    second: energyBallImpact_0
+  - first:
+      213: -7569507464449144537
+    second: energyBallImpact_1
+  - first:
+      213: -6604419880948014333
+    second: energyBallImpact_2
+  - first:
+      213: 3146993007506642277
+    second: energyBallImpact_3
+  - first:
+      213: -6859689289103702929
+    second: energyBallImpact_4
+  - first:
+      213: -6299515613133978942
+    second: energyBallImpact_5
+  - first:
+      213: -4768488859681987944
+    second: energyBallImpact_6
+  - first:
+      213: -4179497919033087503
+    second: energyBallImpact_7
+  - first:
+      213: 1267634117508191879
+    second: energyBallImpact_8
+  - first:
+      213: -515359189159818116
+    second: energyBallImpact_9
+  - first:
+      213: -354091845303242070
+    second: energyBallImpact_10
+  - first:
+      213: 6811977245022970403
+    second: energyBallImpact_11
+  - first:
+      213: -9195157792063299554
+    second: energyBallImpact_12
+  - first:
+      213: -9140196648192655757
+    second: energyBallImpact_13
+  - first:
+      213: -5019353072118670754
+    second: energyBallImpact_14
+  - first:
+      213: -1509481939093997352
+    second: energyBallImpact_15
+  - first:
+      213: -4180397653038936045
+    second: energyBallImpact_16
+  - first:
+      213: -712527099532460873
+    second: energyBallImpact_17
+  - first:
+      213: 4164794270020587370
+    second: energyBallImpact_18
+  - first:
+      213: 4177244317686809006
+    second: energyBallImpact_19
+  - first:
+      213: -7335274397032053575
+    second: energyBallImpact_20
+  - first:
+      213: -8241814433536515220
+    second: energyBallImpact_21
+  - first:
+      213: -7492520160400600365
+    second: energyBallImpact_22
+  - first:
+      213: 4661409503929492082
+    second: energyBallImpact_23
+  - first:
+      213: 3325503965019983101
+    second: energyBallImpact_24
+  - first:
+      213: -1438109732195915613
+    second: energyBallImpact_25
+  - first:
+      213: -3678052892453792158
+    second: energyBallImpact_26
+  - first:
+      213: -2913419664118692136
+    second: energyBallImpact_27
+  - first:
+      213: 1629873714239746124
+    second: energyBallImpact_28
+  - first:
+      213: 3186360551816204681
+    second: energyBallImpact_29
+  - first:
+      213: 4264612284724846930
+    second: energyBallImpact_30
+  - first:
+      213: -2227930009507888950
+    second: energyBallImpact_31
+  - first:
+      213: -5779281385227822688
+    second: energyBallImpact_32
+  - first:
+      213: -998501533775908452
+    second: energyBallImpact_33
+  - first:
+      213: -1469423075917399858
+    second: energyBallImpact_34
+  - first:
+      213: -5768522906172294382
+    second: energyBallImpact_35
+  - first:
+      213: 8758803889341626681
+    second: energyBallImpact_36
+  - first:
+      213: 587452765860538720
+    second: energyBallImpact_37
+  - first:
+      213: -4387251955497534639
+    second: energyBallImpact_38
+  - first:
+      213: 6254851287995471112
+    second: energyBallImpact_39
+  - first:
+      213: -6484620921575230314
+    second: energyBallImpact_40
+  - first:
+      213: 2320149541801085028
+    second: energyBallImpact_41
+  - first:
+      213: -4889264501279628026
+    second: energyBallImpact_42
+  - first:
+      213: 8772194944845553115
+    second: energyBallImpact_43
+  - first:
+      213: -6383672256543560956
+    second: energyBallImpact_44
+  - first:
+      213: -4696122702201214538
+    second: energyBallImpact_45
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: energyBallImpact_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 896
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1cff5688abcd640e0800000000000000
+      internalID: -2285897067133534271
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: energyBallImpact_1
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 768
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 72947d8e015b3f690800000000000000
+      internalID: -7569507464449144537
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: energyBallImpact_2
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 640
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 303e0982c136854a0800000000000000
+      internalID: -6604419880948014333
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: energyBallImpact_3
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 512
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5655213877d5cab20800000000000000
+      internalID: 3146993007506642277
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: energyBallImpact_4
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 384
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f640c6d8fec7dc0a0800000000000000
+      internalID: -6859689289103702929
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: energyBallImpact_5
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 256
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2c24f161def9398a0800000000000000
+      internalID: -6299515613133978942
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: energyBallImpact_6
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 128
+        width: 128
+        height: 128
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8926f3b85ace2ddb0800000000000000
+      internalID: -4768488859681987944
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: f6610efc06537664e96e669a809432ff
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries:
+      - key: SpriteEditor.SliceSettings
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":128.0,"y":128.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":1,"keepEmptyRects":false,"isAlternate":false}'
+    nameFileIdTable:
+      energyBallImpact_0: -2285897067133534271
+      energyBallImpact_1: -7569507464449144537
+      energyBallImpact_2: -6604419880948014333
+      energyBallImpact_3: 3146993007506642277
+      energyBallImpact_4: -6859689289103702929
+      energyBallImpact_5: -6299515613133978942
+      energyBallImpact_6: -4768488859681987944
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

@@ -1,49 +1,47 @@
 using UnityEngine;
 
-public class AttackGuideline : MonoBehaviour
+public static class AttackGuideline
 {
-    public static void Show(Vector3 from, Vector3 to, float width, Color color, float duration)
+    public static void Show(Effector prefab, Vector3 from, Vector3 to, float rotationOffset = 0f)
     {
-        GameObject guidelineObject = new GameObject("AttackGuideline");
-        LineRenderer line = guidelineObject.AddComponent<LineRenderer>();
+        if (prefab == null) return;
 
         from.z = 0f;
         to.z = 0f;
 
-        line.useWorldSpace = true;
-        line.positionCount = 2;
-        line.SetPosition(0, from);
-        line.SetPosition(1, to);
-        line.startWidth = width;
-        line.endWidth = width;
-        line.startColor = color;
-        line.endColor = color;
-        line.numCapVertices = 4;
-        line.alignment = LineAlignment.TransformZ;
-        line.sortingOrder = 50;
-        line.material = CreateLineMaterial(color);
+        Vector3 delta = to - from;
+        float distance = delta.magnitude;
+        if (distance <= 0.0001f) return;
 
-        AttackGuideline lifetime = guidelineObject.AddComponent<AttackGuideline>();
-        lifetime.remainingDuration = Mathf.Max(0.01f, duration);
+        Effector effect = Object.Instantiate(prefab);
+        effect.PlayOnce();
+        FitBetween(effect, from, to, rotationOffset);
     }
 
-    private float remainingDuration;
-
-    private void Update()
+    private static void FitBetween(Effector effect, Vector3 from, Vector3 to, float rotationOffset)
     {
-        remainingDuration -= Time.deltaTime;
-        if (remainingDuration <= 0f)
-            Destroy(gameObject);
+        Vector3 delta = to - from;
+        float distance = delta.magnitude;
+        Vector3 mid = (from + to) * 0.5f;
+        mid.z = 0f;
+
+        effect.transform.position = mid;
+
+        float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+        effect.transform.rotation = Quaternion.Euler(0f, 0f, angle + rotationOffset);
+
+        float spriteWidth = GetSpriteWidth(effect);
+        Vector3 scale = effect.transform.localScale;
+        scale.x = distance / spriteWidth;
+        effect.transform.localScale = scale;
     }
 
-    private static Material CreateLineMaterial(Color color)
+    private static float GetSpriteWidth(Effector effect)
     {
-        Shader shader = Shader.Find("Sprites/Default");
-        if (shader == null)
-            shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default");
+        SpriteRenderer spriteRenderer = effect.GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null && spriteRenderer.sprite != null)
+            return Mathf.Max(0.0001f, spriteRenderer.sprite.bounds.size.x);
 
-        Material material = shader != null ? new Material(shader) : new Material(Shader.Find("Unlit/Color"));
-        material.color = color;
-        return material;
+        return 1f;
     }
 }
