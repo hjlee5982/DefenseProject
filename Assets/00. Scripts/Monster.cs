@@ -8,10 +8,12 @@ public class Monster : MonoBehaviour
     [SerializeField] private int maxHp = 1;
 
     public static event Action AnyDestroyed;
+    public static event Action Killed;
 
     private int hp;
     private int reservedDamage;
     private bool isDead;
+    private bool wasKilled;
     private readonly Dictionary<MonoBehaviour, int> reservations = new();
 
     public int Hp => hp;
@@ -67,25 +69,27 @@ public class Monster : MonoBehaviour
         if (isDead || amount <= 0 || hp <= 0) return;
 
         hp -= amount;
-        if (hp <= 0) Die();
+        if (hp <= 0) Die(killed: true);
     }
 
-    private void Die()
+    private void Die(bool killed)
     {
         if (isDead) return;
         isDead = true;
+        wasKilled = killed;
         Destroy(gameObject);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.GetComponent<Shield>() == null) return;
-        Die();
+        Die(killed: false);
     }
 
     private void OnDestroy()
     {
         CancelInboundProjectiles();
+        if (wasKilled) Killed?.Invoke();
         AnyDestroyed?.Invoke();
     }
 

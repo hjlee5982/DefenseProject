@@ -25,6 +25,13 @@ public class Projectile : MonoBehaviour
     public int Damage => damage;
     public Effector EffectPrefab => effectPrefab;
 
+    public void ApplyCombatStats(float newRange, int newDamage, float newFireInterval)
+    {
+        range = newRange;
+        damage = newDamage;
+        fireInterval = newFireInterval;
+    }
+
     public bool Init(Monster targetMonster)
     {
         reservedAmount = Mathf.Max(0, damage);

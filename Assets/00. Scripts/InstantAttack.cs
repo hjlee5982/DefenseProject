@@ -18,6 +18,13 @@ public class InstantAttack : MonoBehaviour
     public int Damage => damage;
     public Effector EffectPrefab => effectPrefab;
 
+    public void ApplyCombatStats(float newRange, int newDamage, float newFireInterval)
+    {
+        range = newRange;
+        damage = newDamage;
+        fireInterval = newFireInterval;
+    }
+
     public bool Init(Monster targetMonster, Vector3 origin)
     {
         target = targetMonster;

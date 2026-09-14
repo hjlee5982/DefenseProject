@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -55,6 +56,13 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     private float dragStartAngleZ;
     private float dragStartTargetAngleZ;
 
+    private string dataId;
+    private string displayName;
+    private float range;
+    private int damage;
+    private float fireInterval;
+    private bool hasCombatStats;
+
     public Projectile ProjectilePrefab => projectilePrefab;
     public InstantAttack InstantAttackPrefab => instantAttackPrefab;
     public Sprite Icon => icon;
@@ -62,6 +70,11 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     public int Grade => grade;
     public int MaxGrade => gradeColors != null && gradeColors.Length > 0 ? gradeColors.Length : 1;
     public string ShopBanKey => GetTypeKey();
+    public string DataId => dataId;
+    public string DisplayName => string.IsNullOrEmpty(displayName) ? GetTypeKey() : displayName;
+    public float Range => hasCombatStats ? range : GetFallbackRange();
+    public int Damage => hasCombatStats ? damage : GetFallbackDamage();
+    public float FireInterval => hasCombatStats ? fireInterval : GetFallbackFireInterval();
     public ItemCategory Category => category;
     public bool IsBuff => category == ItemCategory.Buff;
     public bool IsWeapon => category == ItemCategory.WeaponProjectile || category == ItemCategory.WeaponInstant;
@@ -82,6 +95,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         CacheShapeCells();
         CacheGradeImages();
         ApplyGradeColor();
+        ApplyGameData();
     }
 
     private void OnDestroy()
@@ -261,6 +275,67 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         }
 
         return objectName;
+    }
+
+    private void ApplyGameData()
+    {
+        if (!GameDataRepository.TryGetItemByPrefabKey(GetTypeKey(), out ItemData itemData))
+            return;
+
+        dataId = itemData.Id;
+        displayName = itemData.Name;
+        ApplyCategoryFromData(itemData);
+
+        if (!itemData.HasCombatStats) return;
+
+        hasCombatStats = true;
+        range = itemData.Range;
+        damage = itemData.Damage;
+        fireInterval = itemData.FireInterval;
+    }
+
+    private void ApplyCategoryFromData(ItemData itemData)
+    {
+        string categoryText = itemData.Category;
+        if (string.IsNullOrWhiteSpace(categoryText)) return;
+
+        if (categoryText.Equals("Buff", StringComparison.OrdinalIgnoreCase))
+        {
+            category = ItemCategory.Buff;
+            return;
+        }
+
+        if (!categoryText.Equals("Weapon", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (itemData.WeaponType.Equals("Instant", StringComparison.OrdinalIgnoreCase))
+        {
+            category = ItemCategory.WeaponInstant;
+            return;
+        }
+
+        category = ItemCategory.WeaponProjectile;
+    }
+
+    private float GetFallbackRange()
+    {
+        if (projectilePrefab != null) return projectilePrefab.Range;
+        if (instantAttackPrefab != null) return instantAttackPrefab.Range;
+        return 0f;
+    }
+
+    private int GetFallbackDamage()
+    {
+        if (projectilePrefab != null) return projectilePrefab.Damage;
+        if (instantAttackPrefab != null) return instantAttackPrefab.Damage;
+        return 0;
+    }
+
+    private float GetFallbackFireInterval()
+    {
+        if (projectilePrefab != null) return projectilePrefab.FireInterval;
+        if (instantAttackPrefab != null) return instantAttackPrefab.FireInterval;
+        return 1f;
     }
 
     private void RestoreDragStartState()

@@ -12,25 +12,45 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject roundPanel;
     [SerializeField] private TextMeshProUGUI roundText;
     [SerializeField] private GameObject goldPanel;
+    [SerializeField] private TextMeshProUGUI goldText;
+    [SerializeField] private GameObject expPanel;
+    [SerializeField] private TextMeshProUGUI expText;
+    [SerializeField] private GameObject levelPanel;
+    [SerializeField] private TextMeshProUGUI levelText;
+    [SerializeField] private GameObject enhancePanel;
     [SerializeField] private EquipSlotView equipSlot;
     [SerializeField] private Spawner spawner;
     [SerializeField] private PlayerShooter playerShooter;
     [SerializeField] private RoundEventScheduler roundEventScheduler;
 
+    private const int GoldPerKill = 1000;
+    private const int ExpPerKill = 10;
+    private const int ExpPerLevel = 100;
+
     private bool inCombat;
     private int aliveMonsters;
     private int clearedStageCount;
     private bool isInitialExpansionPhase;
+    private int gold;
+    private int exp;
+    private int level = 1;
+    private bool isEnhanceOpen;
+    private int pendingEnhanceCount;
+    private bool pendingReturnToPrepare;
 
     private Button nextButtonComponent;
+    private Button[] enhanceButtons;
 
     private void Awake()
     {
         spawner.enabled = false;
         playerShooter.enabled = false;
         equipSlot.gameObject.SetActive(false);
-        ResolveGoldPanel();
+        ResolveCombatHudPanels();
+        ResolveEnhancePanel();
+        RefreshCombatHudTexts();
         SetCombatHudActive(false);
+        SetEnhanceActive(false);
 
         nextButtonComponent = nextButton.GetComponent<Button>();
         nextButtonComponent.onClick.AddListener(OnNextClicked);
@@ -46,6 +66,8 @@ public class GameManager : MonoBehaviour
     private void OnDestroy()
     {
         UnsubscribeCombatEvents();
+        UnwireEnhanceButtons();
+        Time.timeScale = 1f;
         if (inventoryManager != null)
         {
             inventoryManager.ExpansionStateChanged -= UpdateNextButtonState;
@@ -116,6 +138,8 @@ public class GameManager : MonoBehaviour
     private void ReturnToPrepare()
     {
         inCombat = false;
+        pendingReturnToPrepare = false;
+        CloseEnhance(force: true);
         UnsubscribeCombatEvents();
 
         spawner.enabled = false;
@@ -207,20 +231,134 @@ public class GameManager : MonoBehaviour
         SetCombatHudActive(true);
     }
 
-    private void ResolveGoldPanel()
+    private void ResolveCombatHudPanels()
     {
-        if (goldPanel != null) return;
+        ResolveSiblingPanel(ref goldPanel, "Gold");
+        ResolveSiblingPanel(ref expPanel, "Exp");
+        ResolveSiblingPanel(ref levelPanel, "Level");
+        ResolvePanelText(ref goldText, goldPanel);
+        ResolvePanelText(ref expText, expPanel);
+        ResolvePanelText(ref levelText, levelPanel);
+    }
+
+    private void ResolveEnhancePanel()
+    {
+        ResolveSiblingPanel(ref enhancePanel, "Enhance");
+        WireEnhanceButtons();
+    }
+
+    private void ResolveSiblingPanel(ref GameObject panel, string panelName)
+    {
+        if (panel != null) return;
         if (roundPanel == null || roundPanel.transform.parent == null) return;
 
-        Transform found = roundPanel.transform.parent.Find("Gold");
+        Transform found = roundPanel.transform.parent.Find(panelName);
         if (found != null)
-            goldPanel = found.gameObject;
+            panel = found.gameObject;
+    }
+
+    private static void ResolvePanelText(ref TextMeshProUGUI text, GameObject panel)
+    {
+        if (text != null || panel == null) return;
+        text = panel.GetComponentInChildren<TextMeshProUGUI>(true);
+    }
+
+    private void WireEnhanceButtons()
+    {
+        UnwireEnhanceButtons();
+        if (enhancePanel == null) return;
+
+        enhanceButtons = enhancePanel.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < enhanceButtons.Length; i++)
+        {
+            enhanceButtons[i].onClick.AddListener(OnEnhanceOptionSelected);
+        }
+    }
+
+    private void UnwireEnhanceButtons()
+    {
+        if (enhanceButtons == null) return;
+
+        for (int i = 0; i < enhanceButtons.Length; i++)
+        {
+            if (enhanceButtons[i] != null)
+                enhanceButtons[i].onClick.RemoveListener(OnEnhanceOptionSelected);
+        }
+
+        enhanceButtons = null;
     }
 
     private void SetCombatHudActive(bool active)
     {
         if (roundPanel != null) roundPanel.SetActive(active);
         if (goldPanel != null) goldPanel.SetActive(active);
+        if (expPanel != null) expPanel.SetActive(active);
+        if (levelPanel != null) levelPanel.SetActive(active);
+    }
+
+    private void SetEnhanceActive(bool active)
+    {
+        if (enhancePanel != null) enhancePanel.SetActive(active);
+    }
+
+    private void RefreshCombatHudTexts()
+    {
+        if (goldText != null) goldText.text = gold.ToString();
+        if (expText != null) expText.text = exp.ToString();
+        if (levelText != null) levelText.text = level.ToString();
+    }
+
+    private void OpenEnhance(int levelUps)
+    {
+        if (levelUps <= 0) return;
+
+        pendingEnhanceCount += levelUps;
+        if (isEnhanceOpen) return;
+
+        isEnhanceOpen = true;
+        SetEnhanceActive(true);
+        Time.timeScale = 0f;
+    }
+
+    private void OnEnhanceOptionSelected()
+    {
+        if (!isEnhanceOpen) return;
+
+        pendingEnhanceCount = Mathf.Max(0, pendingEnhanceCount - 1);
+        if (pendingEnhanceCount > 0) return;
+
+        CloseEnhance(force: false);
+    }
+
+    private void CloseEnhance(bool force)
+    {
+        if (force)
+            pendingEnhanceCount = 0;
+
+        if (!isEnhanceOpen && pendingEnhanceCount <= 0)
+        {
+            Time.timeScale = 1f;
+            SetEnhanceActive(false);
+            return;
+        }
+
+        if (pendingEnhanceCount > 0)
+        {
+            isEnhanceOpen = true;
+            SetEnhanceActive(true);
+            Time.timeScale = 0f;
+            return;
+        }
+
+        isEnhanceOpen = false;
+        SetEnhanceActive(false);
+        Time.timeScale = 1f;
+
+        if (pendingReturnToPrepare)
+        {
+            pendingReturnToPrepare = false;
+            ReturnToPrepare();
+        }
     }
 
     private void SubscribeCombatEvents()
@@ -228,17 +366,40 @@ public class GameManager : MonoBehaviour
         UnsubscribeCombatEvents();
         spawner.MonsterSpawned += OnMonsterSpawned;
         Monster.AnyDestroyed += OnMonsterDestroyed;
+        Monster.Killed += OnMonsterKilled;
     }
 
     private void UnsubscribeCombatEvents()
     {
         spawner.MonsterSpawned -= OnMonsterSpawned;
         Monster.AnyDestroyed -= OnMonsterDestroyed;
+        Monster.Killed -= OnMonsterKilled;
     }
 
     private void OnMonsterSpawned()
     {
         aliveMonsters++;
+    }
+
+    private void OnMonsterKilled()
+    {
+        if (!inCombat) return;
+
+        gold += GoldPerKill;
+        exp += ExpPerKill;
+
+        int levelUps = 0;
+        while (exp >= ExpPerLevel)
+        {
+            exp -= ExpPerLevel;
+            level++;
+            levelUps++;
+        }
+
+        RefreshCombatHudTexts();
+
+        if (levelUps > 0)
+            OpenEnhance(levelUps);
     }
 
     private void OnMonsterDestroyed()
@@ -248,6 +409,12 @@ public class GameManager : MonoBehaviour
         aliveMonsters = Mathf.Max(0, aliveMonsters - 1);
         if (!spawner.HasFinishedSpawning) return;
         if (aliveMonsters > 0) return;
+
+        if (isEnhanceOpen || pendingEnhanceCount > 0)
+        {
+            pendingReturnToPrepare = true;
+            return;
+        }
 
         ReturnToPrepare();
     }

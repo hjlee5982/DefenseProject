@@ -8,6 +8,7 @@ public class PlayerShooter : MonoBehaviour
         public int equipSlotIndex;
         public float fireInterval;
         public float range;
+        public int damage;
         public Projectile projectilePrefab;
         public InstantAttack instantAttackPrefab;
     }
@@ -35,8 +36,9 @@ public class PlayerShooter : MonoBehaviour
                 equippedWeapons.Add(new EquippedWeapon
                 {
                     equipSlotIndex = equipSlotIndex,
-                    fireInterval = projectile.FireInterval,
-                    range = projectile.Range,
+                    fireInterval = item.FireInterval,
+                    range = item.Range,
+                    damage = item.Damage,
                     projectilePrefab = projectile
                 });
                 equipSlotIndex++;
@@ -49,8 +51,9 @@ public class PlayerShooter : MonoBehaviour
                 equippedWeapons.Add(new EquippedWeapon
                 {
                     equipSlotIndex = equipSlotIndex,
-                    fireInterval = instantAttack.FireInterval,
-                    range = instantAttack.Range,
+                    fireInterval = item.FireInterval,
+                    range = item.Range,
+                    damage = item.Damage,
                     instantAttackPrefab = instantAttack
                 });
                 equipSlotIndex++;
@@ -87,6 +90,7 @@ public class PlayerShooter : MonoBehaviour
         if (weapon.projectilePrefab != null)
         {
             Projectile projectile = Instantiate(weapon.projectilePrefab, transform.position, Quaternion.identity);
+            projectile.ApplyCombatStats(weapon.range, weapon.damage, weapon.fireInterval);
             if (projectile.Init(target))
                 return true;
 
@@ -97,6 +101,7 @@ public class PlayerShooter : MonoBehaviour
         if (weapon.instantAttackPrefab != null)
         {
             InstantAttack attack = Instantiate(weapon.instantAttackPrefab, transform.position, Quaternion.identity);
+            attack.ApplyCombatStats(weapon.range, weapon.damage, weapon.fireInterval);
             if (attack.Init(target, transform.position))
                 return true;
 
