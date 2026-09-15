@@ -17,6 +17,10 @@ public class InventoryManager : MonoBehaviour
     [SerializeField] public GameObject Shop;
     [SerializeField] private Button shopRerollButton;
     [SerializeField] private Button shopCompressButton;
+    [SerializeField] private Button shopReturnButton;
+    [SerializeField] private Button nextButton;
+    [SerializeField] private Button rotateButton0;
+    [SerializeField] private Button rotateButton1;
     [SerializeField] private GameObject clearPanel;
     [SerializeField] private GameObject expansionPanel;
     [SerializeField] private TextMeshProUGUI expansionCountText;
@@ -47,6 +51,7 @@ public class InventoryManager : MonoBehaviour
     private readonly List<int> placementIndices = new();
     private readonly List<Vector2Int> shapeBuffer = new();
     private readonly List<RaycastResult> raycastResults = new();
+    private Item draggingItem;
 
     public float BagCellSize => Bag.CellSize;
     public RectTransform DragLayer => transform as RectTransform;
@@ -90,7 +95,10 @@ public class InventoryManager : MonoBehaviour
         ResolveExpansionCountText();
         BindShopRerollButton();
         BindShopCompressButton();
-        UpdateShopActionButtons();
+        BindShopReturnButton();
+        BindNextButton();
+        BindRotateButtons();
+        UpdateModeActionButtons();
 
         SpawnShopItems();
     }
@@ -101,6 +109,9 @@ public class InventoryManager : MonoBehaviour
             shopRerollButton.onClick.RemoveListener(OnShopRerollClicked);
         if (shopCompressButton != null)
             shopCompressButton.onClick.RemoveListener(OnShopCompressClicked);
+        if (shopReturnButton != null)
+            shopReturnButton.onClick.RemoveListener(OnShopReturnClicked);
+        UnbindRotateButtons();
     }
 
     private void BindShopRerollButton()
@@ -120,7 +131,9 @@ public class InventoryManager : MonoBehaviour
     {
         if (shopCompressButton == null && Shop != null)
         {
-            Transform found = Shop.transform.Find("Compress");
+            Transform found = Shop.transform.Find("Optimize");
+            if (found == null)
+                found = Shop.transform.Find("Compress");
             if (found != null)
                 shopCompressButton = found.GetComponent<Button>();
         }
@@ -129,9 +142,32 @@ public class InventoryManager : MonoBehaviour
         shopCompressButton.onClick.AddListener(OnShopCompressClicked);
     }
 
+    private void BindShopReturnButton()
+    {
+        if (shopReturnButton == null && Shop != null)
+        {
+            Transform found = Shop.transform.Find("Return");
+            if (found != null)
+                shopReturnButton = found.GetComponent<Button>();
+        }
+
+        if (shopReturnButton == null) return;
+        shopReturnButton.onClick.AddListener(OnShopReturnClicked);
+    }
+
+    private void BindNextButton()
+    {
+        if (nextButton == null)
+        {
+            Transform found = transform.Find("Next");
+            if (found != null)
+                nextButton = found.GetComponent<Button>();
+        }
+    }
+
     private void OnShopRerollClicked()
     {
-        if (preparePhaseMode == PreparePhaseMode.BagExpansion) return;
+        if (preparePhaseMode != PreparePhaseMode.Normal) return;
         RefreshShop();
     }
 
@@ -141,15 +177,129 @@ public class InventoryManager : MonoBehaviour
         EnterPreparePhase(PreparePhaseMode.ItemCompress);
     }
 
-    private void UpdateShopActionButtons()
+    private void OnShopReturnClicked()
     {
-        bool canCompress = preparePhaseMode == PreparePhaseMode.Normal;
-        if (shopCompressButton != null)
-            shopCompressButton.interactable = canCompress;
+        if (preparePhaseMode != PreparePhaseMode.ItemCompress) return;
+        ReturnClearItemsToShop();
+        ExitSpecialPreparePhase();
+    }
 
-        bool canReroll = preparePhaseMode != PreparePhaseMode.BagExpansion;
-        if (shopRerollButton != null)
-            shopRerollButton.interactable = canReroll;
+    private void BindRotateButtons()
+    {
+        if (rotateButton0 == null)
+        {
+            Transform found = transform.Find("Rotate_0");
+            if (found != null)
+                rotateButton0 = found.GetComponent<Button>();
+        }
+
+        if (rotateButton1 == null)
+        {
+            Transform found = transform.Find("Rotate_1");
+            if (found != null)
+                rotateButton1 = found.GetComponent<Button>();
+        }
+
+        if (rotateButton0 != null)
+            rotateButton0.onClick.AddListener(OnRotateButton0Clicked);
+        if (rotateButton1 != null)
+            rotateButton1.onClick.AddListener(OnRotateButton1Clicked);
+    }
+
+    private void UnbindRotateButtons()
+    {
+        if (rotateButton0 != null)
+            rotateButton0.onClick.RemoveListener(OnRotateButton0Clicked);
+        if (rotateButton1 != null)
+            rotateButton1.onClick.RemoveListener(OnRotateButton1Clicked);
+    }
+
+    private void OnRotateButton0Clicked()
+    {
+        TryRotateDraggingItem(clockwise: false);
+    }
+
+    private void OnRotateButton1Clicked()
+    {
+        TryRotateDraggingItem(clockwise: true);
+    }
+
+    public void NotifyItemDragBegan(Item item)
+    {
+        draggingItem = item;
+    }
+
+    public void NotifyItemDragEnded(Item item)
+    {
+        if (draggingItem == item)
+            draggingItem = null;
+    }
+
+    private void TryRotateDraggingItem(bool clockwise)
+    {
+        if (draggingItem == null) return;
+        draggingItem.TryRotate(clockwise);
+    }
+
+    private void UpdateModeActionButtons()
+    {
+        bool optimizeMode = preparePhaseMode == PreparePhaseMode.ItemCompress;
+        bool expansionMode = preparePhaseMode == PreparePhaseMode.BagExpansion;
+        bool shopVisible = Shop != null && Shop.activeSelf;
+
+        SetButtonActive(shopCompressButton, shopVisible && !optimizeMode);
+        SetButtonActive(shopRerollButton, shopVisible && !optimizeMode);
+        SetButtonActive(shopReturnButton, shopVisible && optimizeMode);
+
+        SetButtonActive(nextButton, !optimizeMode);
+        if (nextButton != null)
+        {
+            // 슬롯확장모드에서는 남은 확장 칸을 모두 선택해야 Next 가능
+            nextButton.interactable = !expansionMode || RemainingExpansionCount <= 0;
+        }
+
+        SetButtonActive(rotateButton0, shopVisible && !optimizeMode);
+        SetButtonActive(rotateButton1, shopVisible && !optimizeMode);
+    }
+
+    private static void SetButtonActive(Button button, bool active)
+    {
+        if (button == null) return;
+        button.gameObject.SetActive(active);
+    }
+
+    private void ReturnClearItemsToShop()
+    {
+        if (clearSlots == null) return;
+
+        for (int i = 0; i < clearSlots.Length; i++)
+        {
+            RectTransform clearSlot = clearSlots[i];
+            if (clearSlot == null) continue;
+
+            for (int childIndex = clearSlot.childCount - 1; childIndex >= 0; childIndex--)
+            {
+                Item item = clearSlot.GetChild(childIndex).GetComponent<Item>();
+                if (item == null) continue;
+
+                if (!TryPlaceItemOnEmptyShopSlot(item))
+                    Destroy(item.gameObject);
+            }
+        }
+    }
+
+    private bool TryPlaceItemOnEmptyShopSlot(Item item)
+    {
+        for (int i = 0; i < shopSlots.Length; i++)
+        {
+            RectTransform shopSlot = shopSlots[i];
+            if (!IsShopSlotEmpty(shopSlot, item)) continue;
+
+            item.PlaceOnShop(shopSlot);
+            return true;
+        }
+
+        return false;
     }
 
     private void CacheShopSlots()
@@ -244,7 +394,7 @@ public class InventoryManager : MonoBehaviour
             ExpansionStateChanged?.Invoke();
         }
 
-        UpdateShopActionButtons();
+        UpdateModeActionButtons();
     }
 
     public void ExitSpecialPreparePhase()
@@ -257,7 +407,7 @@ public class InventoryManager : MonoBehaviour
         if (clearPanel != null) clearPanel.SetActive(false);
         ConfigureExpansionPanel(false);
         Shop.SetActive(true);
-        UpdateShopActionButtons();
+        UpdateModeActionButtons();
     }
 
     public bool TryToggleExpansionSelection(Slot slot)
@@ -270,6 +420,7 @@ public class InventoryManager : MonoBehaviour
             slot.SetExpansionSelected(false);
             selectedExpansionSlots.Remove(slot);
             UpdateExpansionCountText();
+            UpdateModeActionButtons();
             ExpansionStateChanged?.Invoke();
             return true;
         }
@@ -279,6 +430,7 @@ public class InventoryManager : MonoBehaviour
         slot.SetExpansionSelected(true);
         selectedExpansionSlots.Add(slot);
         UpdateExpansionCountText();
+        UpdateModeActionButtons();
         ExpansionStateChanged?.Invoke();
         return true;
     }
@@ -296,6 +448,7 @@ public class InventoryManager : MonoBehaviour
         selectedExpansionSlots.Clear();
         Bag.SetExpandableOnLockedSlots(false);
         UpdateExpansionCountText();
+        UpdateModeActionButtons();
         ExpansionStateChanged?.Invoke();
     }
 
@@ -488,7 +641,10 @@ public class InventoryManager : MonoBehaviour
         previewIndices.Clear();
         previewValid = false;
 
-        if (TryGetPlacement(item, screenPosition, eventCamera, placementIndices, out bool canPlace))
+        if (preparePhaseMode != PreparePhaseMode.ItemCompress
+            && Bag != null
+            && Bag.gameObject.activeInHierarchy
+            && TryGetPlacement(item, screenPosition, eventCamera, placementIndices, out bool canPlace))
         {
             previewValid = canPlace;
             for (int i = 0; i < placementIndices.Count; i++)
@@ -513,6 +669,8 @@ public class InventoryManager : MonoBehaviour
 
     public bool TryMergeItems(Item source, Vector2 screenPosition, Camera eventCamera)
     {
+        if (preparePhaseMode == PreparePhaseMode.ItemCompress) return false;
+
         if (!TryGetMergeTarget(source, screenPosition, out Item target))
         {
             return false;
@@ -530,6 +688,9 @@ public class InventoryManager : MonoBehaviour
 
     public bool TryPlaceItem(Item item, Vector2 screenPosition, Camera eventCamera)
     {
+        if (preparePhaseMode == PreparePhaseMode.ItemCompress) return false;
+        if (Bag == null || !Bag.gameObject.activeInHierarchy) return false;
+
         if (!TryGetPlacement(item, screenPosition, eventCamera, placementIndices, out bool canPlace))
         {
             return false;

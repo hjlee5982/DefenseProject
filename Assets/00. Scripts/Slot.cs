@@ -6,13 +6,13 @@ public class Slot : MonoBehaviour, IPointerClickHandler
 {
     private static readonly Color DefaultColor = Color.white;
     private static readonly Color DeactivatedColor = Color.gray;
-    private static readonly Color ValidPreviewColor = Color.blue;
-    private static readonly Color InvalidPreviewColor = Color.red;
 
     private Image image;
     private GameObject lockDisplay;
     private GameObject plusDisplay;
     private GameObject plusGreenDisplay;
+    private GameObject blueDisplay;
+    private GameObject redDisplay;
     private InventoryManager inventoryManager;
     private bool isLocked;
     private bool isExpandable;
@@ -31,30 +31,16 @@ public class Slot : MonoBehaviour, IPointerClickHandler
         image = GetComponent<Image>();
         inventoryManager = GetComponentInParent<InventoryManager>();
 
-        Transform lockTransform = transform.Find("Lock");
-        if (lockTransform != null)
-        {
-            lockDisplay = lockTransform.gameObject;
-            DisableRaycast(lockTransform);
-        }
-
-        Transform plusTransform = transform.Find("Plus");
-        if (plusTransform != null)
-        {
-            plusDisplay = plusTransform.gameObject;
-            DisableRaycast(plusTransform);
-        }
-
-        Transform plusGreenTransform = transform.Find("Plus_Green");
-        if (plusGreenTransform != null)
-        {
-            plusGreenDisplay = plusGreenTransform.gameObject;
-            DisableRaycast(plusGreenTransform);
-        }
+        CacheChildDisplay("Lock", out lockDisplay);
+        CacheChildDisplay("Plus", out plusDisplay);
+        CacheChildDisplay("Plus_Green", out plusGreenDisplay);
+        CacheChildDisplay("Blue", out blueDisplay);
+        CacheChildDisplay("Red", out redDisplay);
 
         ApplyLockVisibility();
         ApplyPlusVisibility();
         ApplyPlusGreenVisibility();
+        ApplyPreviewVisibility(false, true);
         ApplyBaseColor();
     }
 
@@ -120,6 +106,7 @@ public class Slot : MonoBehaviour, IPointerClickHandler
         ApplyLockVisibility();
         ApplyPlusVisibility();
         ApplyPlusGreenVisibility();
+        ApplyPreviewVisibility(false, true);
         ApplyBaseColor();
     }
 
@@ -131,13 +118,9 @@ public class Slot : MonoBehaviour, IPointerClickHandler
 
     public void SetPreview(bool enabled, bool isValid = true)
     {
+        ApplyPreviewVisibility(enabled, isValid);
         if (!enabled)
-        {
             ApplyBaseColor();
-            return;
-        }
-
-        image.color = isValid ? ValidPreviewColor : InvalidPreviewColor;
     }
 
     public void OnPointerClick(PointerEventData eventData)
@@ -156,46 +139,49 @@ public class Slot : MonoBehaviour, IPointerClickHandler
         image.color = isActivated ? DefaultColor : DeactivatedColor;
     }
 
+    private void ApplyPreviewVisibility(bool enabled, bool isValid)
+    {
+        SetDisplayVisible(blueDisplay, enabled && isValid);
+        SetDisplayVisible(redDisplay, enabled && !isValid);
+    }
+
     private void ApplyPlusGreenVisibility()
     {
-        if (plusGreenDisplay == null) return;
-
-        bool showPlusGreen = isLocked && isExpandable && isExpansionSelected;
-        plusGreenDisplay.SetActive(showPlusGreen);
-
-        Image plusGreenImage = plusGreenDisplay.GetComponent<Image>();
-        if (plusGreenImage != null)
-        {
-            plusGreenImage.enabled = showPlusGreen;
-        }
+        SetDisplayVisible(plusGreenDisplay, isLocked && isExpandable && isExpansionSelected);
     }
 
     private void ApplyLockVisibility()
     {
-        if (lockDisplay == null) return;
-
-        bool showLock = isLocked && !isExpandable;
-        lockDisplay.SetActive(showLock);
-
-        Image lockImage = lockDisplay.GetComponent<Image>();
-        if (lockImage != null)
-        {
-            lockImage.enabled = showLock;
-        }
+        SetDisplayVisible(lockDisplay, isLocked && !isExpandable);
     }
 
     private void ApplyPlusVisibility()
     {
-        if (plusDisplay == null) return;
+        SetDisplayVisible(plusDisplay, isLocked && isExpandable && !isExpansionSelected);
+    }
 
-        bool showPlus = isLocked && isExpandable && !isExpansionSelected;
-        plusDisplay.SetActive(showPlus);
-
-        Image plusImage = plusDisplay.GetComponent<Image>();
-        if (plusImage != null)
+    private void CacheChildDisplay(string childName, out GameObject display)
+    {
+        Transform child = transform.Find(childName);
+        if (child == null)
         {
-            plusImage.enabled = showPlus;
+            display = null;
+            return;
         }
+
+        display = child.gameObject;
+        DisableRaycast(child);
+    }
+
+    private static void SetDisplayVisible(GameObject display, bool visible)
+    {
+        if (display == null) return;
+
+        display.SetActive(visible);
+
+        Image displayImage = display.GetComponent<Image>();
+        if (displayImage != null)
+            displayImage.enabled = visible;
     }
 
     private static void DisableRaycast(Transform target)

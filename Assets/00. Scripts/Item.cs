@@ -101,6 +101,8 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     private void OnDestroy()
     {
         rotateTween?.Kill();
+        if (isDragging && inventoryManager != null)
+            inventoryManager.NotifyItemDragEnded(this);
     }
 
     private void Update()
@@ -109,7 +111,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         if (!isDragging) return;
         if (Keyboard.current == null || !Keyboard.current.rKey.wasPressedThisFrame) return;
 
-        RotateClockwiseAroundPivot();
+        TryRotate(clockwise: true);
     }
 
     public bool CanMergeWith(Item other)
@@ -140,6 +142,8 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     public void OnBeginDrag(PointerEventData eventData)
     {
         isDragging = true;
+        if (inventoryManager != null)
+            inventoryManager.NotifyItemDragBegan(this);
 
         dragStartParent = transform.parent;
         dragStartAnchoredPosition = rectTransform.anchoredPosition;
@@ -178,6 +182,8 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     public void OnEndDrag(PointerEventData eventData)
     {
         isDragging = false;
+        if (inventoryManager != null)
+            inventoryManager.NotifyItemDragEnded(this);
 
         rotateTween?.Kill();
         angleZ = targetAngleZ;
@@ -189,10 +195,20 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
             return;
         }
 
-        bool placed =
-            inventoryManager.TryPlaceItem(this, eventData.position, eventData.pressEventCamera) ||
-            inventoryManager.TryPlaceItemOnShop(this, eventData.position, eventData.pressEventCamera) ||
-            inventoryManager.TryPlaceItemOnClear(this, eventData.position, eventData.pressEventCamera, dragStartParent);
+        bool placed;
+        if (inventoryManager.IsClearPrepareMode)
+        {
+            placed =
+                inventoryManager.TryPlaceItemOnClear(this, eventData.position, eventData.pressEventCamera, dragStartParent) ||
+                inventoryManager.TryPlaceItemOnShop(this, eventData.position, eventData.pressEventCamera);
+        }
+        else
+        {
+            placed =
+                inventoryManager.TryPlaceItem(this, eventData.position, eventData.pressEventCamera) ||
+                inventoryManager.TryPlaceItemOnShop(this, eventData.position, eventData.pressEventCamera) ||
+                inventoryManager.TryPlaceItemOnClear(this, eventData.position, eventData.pressEventCamera, dragStartParent);
+        }
 
         inventoryManager.ClearPreview();
 
@@ -418,9 +434,11 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         ApplyPivotFollow();
     }
 
-    private void RotateClockwiseAroundPivot()
+    public bool TryRotate(bool clockwise)
     {
-        targetAngleZ -= 90f;
+        if (disableRotation || !isDragging) return false;
+
+        targetAngleZ += clockwise ? -90f : 90f;
 
         rotateTween?.Kill();
         rotateTween = DOTween.To(() => angleZ, SetAngleZ, targetAngleZ, rotateDuration)
@@ -430,6 +448,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
                 angleZ = targetAngleZ;
                 SetAngleZ(angleZ);
             });
+        return true;
     }
 
     private void SetAngleZ(float z)
