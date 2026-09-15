@@ -182,8 +182,6 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     public void OnEndDrag(PointerEventData eventData)
     {
         isDragging = false;
-        if (inventoryManager != null)
-            inventoryManager.NotifyItemDragEnded(this);
 
         rotateTween?.Kill();
         angleZ = targetAngleZ;
@@ -192,6 +190,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         if (inventoryManager.TryMergeItems(this, eventData.position, eventData.pressEventCamera))
         {
             inventoryManager.ClearPreview();
+            inventoryManager.NotifyItemDragEnded(this);
             return;
         }
 
@@ -212,15 +211,18 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 
         inventoryManager.ClearPreview();
 
-        if (placed) return;
-
-        RestoreDragStartState();
-        if (slotsAtDragStart.Count > 0)
+        if (!placed)
         {
-            inventoryManager.OccupySlots(slotsAtDragStart);
-            occupiedSlots.Clear();
-            occupiedSlots.AddRange(slotsAtDragStart);
+            RestoreDragStartState();
+            if (slotsAtDragStart.Count > 0)
+            {
+                inventoryManager.OccupySlots(slotsAtDragStart);
+                occupiedSlots.Clear();
+                occupiedSlots.AddRange(slotsAtDragStart);
+            }
         }
+
+        inventoryManager.NotifyItemDragEnded(this);
     }
 
     public void PlaceOnBag(Transform itemsParent, RectTransform pivotSlot, float bagCellSize)

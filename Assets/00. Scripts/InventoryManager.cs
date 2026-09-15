@@ -16,7 +16,8 @@ public class InventoryManager : MonoBehaviour
     [SerializeField] public Bag Bag;
     [SerializeField] public GameObject Shop;
     [SerializeField] private Button shopRerollButton;
-    [SerializeField] private Button shopCompressButton;
+    [SerializeField] private Button shopOpenOptimizeButton;
+    [SerializeField] private Button shopOptimizeButton;
     [SerializeField] private Button shopReturnButton;
     [SerializeField] private Button nextButton;
     [SerializeField] private Button rotateButton0;
@@ -24,6 +25,11 @@ public class InventoryManager : MonoBehaviour
     [SerializeField] private GameObject clearPanel;
     [SerializeField] private GameObject expansionPanel;
     [SerializeField] private TextMeshProUGUI expansionCountText;
+
+    [Header("Optimize")]
+    [SerializeField] private int optimizeAvailableCount = 3;
+    [SerializeField] private TextMeshProUGUI optimizeCountText;
+
     [Header("Item Prefabs")]
     [SerializeField] private ItemPrefabSpawnEntry[] itemPrefabs;
 
@@ -52,6 +58,7 @@ public class InventoryManager : MonoBehaviour
     private readonly List<Vector2Int> shapeBuffer = new();
     private readonly List<RaycastResult> raycastResults = new();
     private Item draggingItem;
+    private int remainingOptimizeCount;
 
     public float BagCellSize => Bag.CellSize;
     public RectTransform DragLayer => transform as RectTransform;
@@ -94,10 +101,14 @@ public class InventoryManager : MonoBehaviour
         CacheClearSlots();
         ResolveExpansionCountText();
         BindShopRerollButton();
-        BindShopCompressButton();
+        BindShopOpenOptimizeButton();
+        BindShopOptimizeButton();
         BindShopReturnButton();
         BindNextButton();
         BindRotateButtons();
+        ResolveOptimizeCountText();
+        remainingOptimizeCount = Mathf.Max(0, optimizeAvailableCount);
+        UpdateOptimizeCountUI();
         UpdateModeActionButtons();
 
         SpawnShopItems();
@@ -107,8 +118,10 @@ public class InventoryManager : MonoBehaviour
     {
         if (shopRerollButton != null)
             shopRerollButton.onClick.RemoveListener(OnShopRerollClicked);
-        if (shopCompressButton != null)
-            shopCompressButton.onClick.RemoveListener(OnShopCompressClicked);
+        if (shopOpenOptimizeButton != null)
+            shopOpenOptimizeButton.onClick.RemoveListener(OnShopOpenOptimizeClicked);
+        if (shopOptimizeButton != null)
+            shopOptimizeButton.onClick.RemoveListener(OnShopOptimizeClicked);
         if (shopReturnButton != null)
             shopReturnButton.onClick.RemoveListener(OnShopReturnClicked);
         UnbindRotateButtons();
@@ -127,19 +140,30 @@ public class InventoryManager : MonoBehaviour
         shopRerollButton.onClick.AddListener(OnShopRerollClicked);
     }
 
-    private void BindShopCompressButton()
+    private void BindShopOpenOptimizeButton()
     {
-        if (shopCompressButton == null && Shop != null)
+        if (shopOpenOptimizeButton == null && Shop != null)
         {
-            Transform found = Shop.transform.Find("Optimize");
-            if (found == null)
-                found = Shop.transform.Find("Compress");
+            Transform found = Shop.transform.Find("OpenOptimize");
             if (found != null)
-                shopCompressButton = found.GetComponent<Button>();
+                shopOpenOptimizeButton = found.GetComponent<Button>();
         }
 
-        if (shopCompressButton == null) return;
-        shopCompressButton.onClick.AddListener(OnShopCompressClicked);
+        if (shopOpenOptimizeButton == null) return;
+        shopOpenOptimizeButton.onClick.AddListener(OnShopOpenOptimizeClicked);
+    }
+
+    private void BindShopOptimizeButton()
+    {
+        if (shopOptimizeButton == null && Shop != null)
+        {
+            Transform found = Shop.transform.Find("Optimize");
+            if (found != null)
+                shopOptimizeButton = found.GetComponent<Button>();
+        }
+
+        if (shopOptimizeButton == null) return;
+        shopOptimizeButton.onClick.AddListener(OnShopOptimizeClicked);
     }
 
     private void BindShopReturnButton()
@@ -171,10 +195,21 @@ public class InventoryManager : MonoBehaviour
         RefreshShop();
     }
 
-    private void OnShopCompressClicked()
+    private void OnShopOpenOptimizeClicked()
     {
         if (preparePhaseMode != PreparePhaseMode.Normal) return;
+        if (remainingOptimizeCount <= 0) return;
         EnterPreparePhase(PreparePhaseMode.ItemCompress);
+    }
+
+    private void OnShopOptimizeClicked()
+    {
+        if (preparePhaseMode != PreparePhaseMode.ItemCompress) return;
+        if (!HasOptimizationItems()) return;
+        ApplyClearBans();
+        remainingOptimizeCount = Mathf.Max(0, remainingOptimizeCount - 1);
+        UpdateOptimizeCountUI();
+        ExitSpecialPreparePhase();
     }
 
     private void OnShopReturnClicked()
@@ -227,12 +262,42 @@ public class InventoryManager : MonoBehaviour
     public void NotifyItemDragBegan(Item item)
     {
         draggingItem = item;
+        RefreshOptimizeButtonState();
     }
 
     public void NotifyItemDragEnded(Item item)
     {
         if (draggingItem == item)
             draggingItem = null;
+        RefreshOptimizeButtonState();
+    }
+
+    public void RefreshOptimizeButtonState()
+    {
+        if (shopOptimizeButton == null) return;
+        if (preparePhaseMode != PreparePhaseMode.ItemCompress) return;
+        if (!shopOptimizeButton.gameObject.activeSelf) return;
+
+        shopOptimizeButton.interactable = HasOptimizationItems();
+    }
+
+    private bool HasOptimizationItems()
+    {
+        if (clearSlots == null) return false;
+
+        for (int i = 0; i < clearSlots.Length; i++)
+        {
+            RectTransform clearSlot = clearSlots[i];
+            if (clearSlot == null) continue;
+
+            for (int childIndex = 0; childIndex < clearSlot.childCount; childIndex++)
+            {
+                if (clearSlot.GetChild(childIndex).GetComponent<Item>() != null)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private void TryRotateDraggingItem(bool clockwise)
@@ -247,9 +312,15 @@ public class InventoryManager : MonoBehaviour
         bool expansionMode = preparePhaseMode == PreparePhaseMode.BagExpansion;
         bool shopVisible = Shop != null && Shop.activeSelf;
 
-        SetButtonActive(shopCompressButton, shopVisible && !optimizeMode);
+        SetButtonActive(shopOpenOptimizeButton, shopVisible && !optimizeMode);
+        if (shopOpenOptimizeButton != null && shopVisible && !optimizeMode)
+            shopOpenOptimizeButton.interactable = remainingOptimizeCount > 0;
+
         SetButtonActive(shopRerollButton, shopVisible && !optimizeMode);
+        SetButtonActive(shopOptimizeButton, shopVisible && optimizeMode);
         SetButtonActive(shopReturnButton, shopVisible && optimizeMode);
+        if (shopOptimizeButton != null && optimizeMode)
+            shopOptimizeButton.interactable = HasOptimizationItems();
 
         SetButtonActive(nextButton, !optimizeMode);
         if (nextButton != null)
@@ -316,6 +387,31 @@ public class InventoryManager : MonoBehaviour
         }
 
         shopSlots = slots.ToArray();
+    }
+
+    private void ResolveOptimizeCountText()
+    {
+        if (optimizeCountText != null) return;
+        if (shopOpenOptimizeButton == null) return;
+
+        Transform countTransform = shopOpenOptimizeButton.transform.Find("Count");
+        if (countTransform == null) return;
+
+        optimizeCountText = countTransform.GetComponent<TextMeshProUGUI>();
+    }
+
+    private void UpdateOptimizeCountUI()
+    {
+        ResolveOptimizeCountText();
+        if (optimizeCountText != null)
+            optimizeCountText.text = remainingOptimizeCount.ToString();
+
+        if (shopOpenOptimizeButton != null
+            && shopOpenOptimizeButton.gameObject.activeSelf
+            && preparePhaseMode == PreparePhaseMode.Normal)
+        {
+            shopOpenOptimizeButton.interactable = remainingOptimizeCount > 0;
+        }
     }
 
     private void ResolveExpansionCountText()
@@ -471,10 +567,14 @@ public class InventoryManager : MonoBehaviour
 
     public void ApplyClearBans()
     {
+        if (clearSlots == null) return;
+
         for (int i = 0; i < clearSlots.Length; i++)
         {
             RectTransform clearSlot = clearSlots[i];
-            for (int childIndex = 0; childIndex < clearSlot.childCount; childIndex++)
+            if (clearSlot == null) continue;
+
+            for (int childIndex = clearSlot.childCount - 1; childIndex >= 0; childIndex--)
             {
                 Item item = clearSlot.GetChild(childIndex).GetComponent<Item>();
                 if (item == null) continue;
