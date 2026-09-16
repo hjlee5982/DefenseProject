@@ -15,6 +15,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI goldText;
     [SerializeField] private GameObject expPanel;
     [SerializeField] private TextMeshProUGUI expText;
+    [SerializeField] private Slider expGauge;
     [SerializeField] private GameObject levelPanel;
     [SerializeField] private TextMeshProUGUI levelText;
     [SerializeField] private GameObject enhancePanel;
@@ -25,7 +26,7 @@ public class GameManager : MonoBehaviour
 
     private const int GoldPerKill = 1000;
     private const int ExpPerKill = 10;
-    private const int ExpPerLevel = 100;
+    private const int DefaultExpToNextLevel = 100;
 
     private bool inCombat;
     private int aliveMonsters;
@@ -239,6 +240,17 @@ public class GameManager : MonoBehaviour
         ResolvePanelText(ref goldText, goldPanel);
         ResolvePanelText(ref expText, expPanel);
         ResolvePanelText(ref levelText, levelPanel);
+        ResolveExpGauge();
+    }
+
+    private void ResolveExpGauge()
+    {
+        if (expGauge != null) return;
+        if (roundPanel == null || roundPanel.transform.parent == null) return;
+
+        Transform found = roundPanel.transform.parent.Find("ExpGauge");
+        if (found != null)
+            expGauge = found.GetComponent<Slider>();
     }
 
     private void ResolveEnhancePanel()
@@ -294,6 +306,7 @@ public class GameManager : MonoBehaviour
         if (goldPanel != null) goldPanel.SetActive(active);
         if (expPanel != null) expPanel.SetActive(active);
         if (levelPanel != null) levelPanel.SetActive(active);
+        if (expGauge != null) expGauge.gameObject.SetActive(active);
     }
 
     private void SetEnhanceActive(bool active)
@@ -306,6 +319,27 @@ public class GameManager : MonoBehaviour
         if (goldText != null) goldText.text = gold.ToString();
         if (expText != null) expText.text = exp.ToString();
         if (levelText != null) levelText.text = level.ToString();
+        RefreshExpGauge();
+    }
+
+    private void RefreshExpGauge()
+    {
+        if (expGauge == null) return;
+
+        int expToNext = GetExpToNextLevel(level);
+        float normalized = expToNext > 0
+            ? Mathf.Clamp01((float)exp / expToNext)
+            : 0f;
+
+        expGauge.minValue = 0f;
+        expGauge.maxValue = 1f;
+        expGauge.value = normalized;
+    }
+
+    private int GetExpToNextLevel(int currentLevel)
+    {
+        // TODO: LevelCurve 데이터에서 currentLevel 기준 필요 경험치를 조회
+        return DefaultExpToNextLevel;
     }
 
     private void OpenEnhance(int levelUps)
@@ -389,9 +423,12 @@ public class GameManager : MonoBehaviour
         exp += ExpPerKill;
 
         int levelUps = 0;
-        while (exp >= ExpPerLevel)
+        while (true)
         {
-            exp -= ExpPerLevel;
+            int expToNext = GetExpToNextLevel(level);
+            if (expToNext <= 0 || exp < expToNext) break;
+
+            exp -= expToNext;
             level++;
             levelUps++;
         }

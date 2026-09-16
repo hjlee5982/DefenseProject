@@ -30,6 +30,12 @@ public class InventoryManager : MonoBehaviour
     [SerializeField] private int optimizeAvailableCount = 3;
     [SerializeField] private TextMeshProUGUI optimizeCountText;
 
+    [Header("Drag")]
+    [Tooltip("켜면 드래그 시 Pivot이 포인터에 붙습니다. 끄면 처음 잡은 위치가 유지됩니다.")]
+    [SerializeField] private bool snapDragToPivot = true;
+    [Tooltip("켜면 아이템 회전을 막고 Rotate UI 버튼을 숨깁니다.")]
+    [SerializeField] private bool disableRotation;
+
     [Header("Item Prefabs")]
     [SerializeField] private ItemPrefabSpawnEntry[] itemPrefabs;
 
@@ -62,6 +68,21 @@ public class InventoryManager : MonoBehaviour
 
     public float BagCellSize => Bag.CellSize;
     public RectTransform DragLayer => transform as RectTransform;
+    public bool SnapDragToPivot
+    {
+        get => snapDragToPivot;
+        set => snapDragToPivot = value;
+    }
+
+    public bool DisableRotation
+    {
+        get => disableRotation;
+        set
+        {
+            disableRotation = value;
+            UpdateModeActionButtons();
+        }
+    }
     public bool IsClearPrepareMode => preparePhaseMode == PreparePhaseMode.ItemCompress;
     public bool IsExpansionPrepareMode => preparePhaseMode == PreparePhaseMode.BagExpansion;
     public bool CanExpandBag => Bag.HasLockedSlots();
@@ -84,13 +105,17 @@ public class InventoryManager : MonoBehaviour
 
     private void OnValidate()
     {
-        if (itemPrefabs == null) return;
-
-        for (int i = 0; i < itemPrefabs.Length; i++)
+        if (itemPrefabs != null)
         {
-            if (itemPrefabs[i] == null)
-                itemPrefabs[i] = new ItemPrefabSpawnEntry();
+            for (int i = 0; i < itemPrefabs.Length; i++)
+            {
+                if (itemPrefabs[i] == null)
+                    itemPrefabs[i] = new ItemPrefabSpawnEntry();
+            }
         }
+
+        if (Application.isPlaying)
+            UpdateModeActionButtons();
     }
 
     private void Awake()
@@ -112,6 +137,17 @@ public class InventoryManager : MonoBehaviour
         UpdateModeActionButtons();
 
         SpawnShopItems();
+    }
+
+    private void OnEnable()
+    {
+        UpdateModeActionButtons();
+    }
+
+    private void OnDisable()
+    {
+        SetButtonActive(rotateButton0, false);
+        SetButtonActive(rotateButton1, false);
     }
 
     private void OnDestroy()
@@ -302,7 +338,7 @@ public class InventoryManager : MonoBehaviour
 
     private void TryRotateDraggingItem(bool clockwise)
     {
-        if (draggingItem == null) return;
+        if (disableRotation || draggingItem == null) return;
         draggingItem.TryRotate(clockwise);
     }
 
@@ -329,8 +365,8 @@ public class InventoryManager : MonoBehaviour
             nextButton.interactable = !expansionMode || RemainingExpansionCount <= 0;
         }
 
-        SetButtonActive(rotateButton0, shopVisible && !optimizeMode);
-        SetButtonActive(rotateButton1, shopVisible && !optimizeMode);
+        SetButtonActive(rotateButton0, !disableRotation && shopVisible && !optimizeMode);
+        SetButtonActive(rotateButton1, !disableRotation && shopVisible && !optimizeMode);
     }
 
     private static void SetButtonActive(Button button, bool active)
@@ -741,10 +777,11 @@ public class InventoryManager : MonoBehaviour
         previewIndices.Clear();
         previewValid = false;
 
+        Vector2 placementScreen = GetBagPlacementScreenPosition(item, screenPosition, eventCamera);
         if (preparePhaseMode != PreparePhaseMode.ItemCompress
             && Bag != null
             && Bag.gameObject.activeInHierarchy
-            && TryGetPlacement(item, screenPosition, eventCamera, placementIndices, out bool canPlace))
+            && TryGetPlacement(item, placementScreen, eventCamera, placementIndices, out bool canPlace))
         {
             previewValid = canPlace;
             for (int i = 0; i < placementIndices.Count; i++)
@@ -791,13 +828,14 @@ public class InventoryManager : MonoBehaviour
         if (preparePhaseMode == PreparePhaseMode.ItemCompress) return false;
         if (Bag == null || !Bag.gameObject.activeInHierarchy) return false;
 
-        if (!TryGetPlacement(item, screenPosition, eventCamera, placementIndices, out bool canPlace))
+        Vector2 placementScreen = GetBagPlacementScreenPosition(item, screenPosition, eventCamera);
+        if (!TryGetPlacement(item, placementScreen, eventCamera, placementIndices, out bool canPlace))
         {
             return false;
         }
 
         if (!canPlace) return false;
-        if (!Bag.TryGetSlotIndex(screenPosition, eventCamera, out int pivotIndex)) return false;
+        if (!Bag.TryGetSlotIndex(placementScreen, eventCamera, out int pivotIndex)) return false;
 
         for (int i = 0; i < placementIndices.Count; i++)
         {
@@ -807,6 +845,12 @@ public class InventoryManager : MonoBehaviour
         item.PlaceOnBag(Bag.Items, Bag.Slots[pivotIndex].RectTransform, Bag.CellSize);
         item.SetOccupiedSlots(placementIndices);
         return true;
+    }
+
+    private static Vector2 GetBagPlacementScreenPosition(Item item, Vector2 screenPosition, Camera eventCamera)
+    {
+        if (item == null) return screenPosition;
+        return item.GetPivotScreenPosition(eventCamera);
     }
 
     public bool TryPlaceItemOnShop(Item item, Vector2 screenPosition, Camera eventCamera)

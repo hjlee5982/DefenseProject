@@ -4498,13 +4498,13 @@ TextureImporter:
       name: UI_32
       rect:
         serializedVersion: 2
-        x: 106
-        y: 810
-        width: 28
-        height: 28
+        x: 107
+        y: 811
+        width: 26
+        height: 26
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
+      border: {x: 4, y: 4, z: 4, w: 4}
       customData: 
       outline: []
       physicsShape: []
@@ -11098,13 +11098,13 @@ TextureImporter:
       name: UI_332
       rect:
         serializedVersion: 2
-        x: 533
-        y: 609
-        width: 101
-        height: 15
+        x: 534
+        y: 610
+        width: 99
+        height: 13
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
+      border: {x: 3, y: 5, z: 4, w: 4}
       customData: 
       outline: []
       physicsShape: []
@@ -13320,13 +13320,13 @@ TextureImporter:
       name: UI_433
       rect:
         serializedVersion: 2
-        x: 583
-        y: 596
-        width: 32
-        height: 10
+        x: 584
+        y: 597
+        width: 30
+        height: 8
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
+      border: {x: 2, y: 3, z: 2, w: 3}
       customData: 
       outline: []
       physicsShape: []
@@ -31076,7 +31076,10 @@ TextureImporter:
       UI_1225: -2802685355868528758
       UI_1226: -1633118738189977928
       UI_1227: -1563438777
+      UI_1228: -2045707056
+      UI_1229: 1853626014
       UI_123: -6223512909719952081
+      UI_1230: 61321671
       UI_124: 2298894743280239371
       UI_125: -9219598925763888543
       UI_126: 346264754882382127

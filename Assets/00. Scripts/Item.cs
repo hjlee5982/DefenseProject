@@ -17,7 +17,6 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 
     [SerializeField] private float rotateDuration = 0.15f;
     [SerializeField] private float cellSize = 100f;
-    [SerializeField] private bool disableRotation;
     [SerializeField] private ItemCategory category = ItemCategory.WeaponProjectile;
     [SerializeField] private int grade = 1;
     [SerializeField] private Color[] gradeColors =
@@ -38,7 +37,8 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     private RectTransform pivotRect;
     private InventoryManager inventoryManager;
     private bool isDragging;
-    private Vector2 pivotFollowPoint;
+    private Vector2 pointerFollowPoint;
+    private Vector2 dragGrabOffsetLocal;
     private Vector2 lastScreenPosition;
     private Camera lastPressCamera;
     private Tween rotateTween;
@@ -107,7 +107,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 
     private void Update()
     {
-        if (disableRotation) return;
+        if (inventoryManager != null && inventoryManager.DisableRotation) return;
         if (!isDragging) return;
         if (Keyboard.current == null || !Keyboard.current.rKey.wasPressedThisFrame) return;
 
@@ -169,7 +169,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         rectTransform.SetParent(inventoryManager.DragLayer, true);
         parentRect = inventoryManager.DragLayer;
         transform.SetAsLastSibling();
-        MoveToPointer(eventData);
+        BeginPointerFollow(eventData);
         UpdatePreview(eventData);
     }
 
@@ -421,6 +421,25 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         return gradeColors[index];
     }
 
+    private void BeginPointerFollow(PointerEventData eventData)
+    {
+        bool snapToPivot = inventoryManager == null || inventoryManager.SnapDragToPivot;
+        if (snapToPivot || pivotRect == null)
+        {
+            dragGrabOffsetLocal = pivotRect != null ? pivotRect.anchoredPosition : Vector2.zero;
+        }
+        else if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                     rectTransform,
+                     eventData.position,
+                     eventData.pressEventCamera,
+                     out dragGrabOffsetLocal))
+        {
+            dragGrabOffsetLocal = pivotRect.anchoredPosition;
+        }
+
+        MoveToPointer(eventData);
+    }
+
     private void MoveToPointer(PointerEventData eventData)
     {
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -432,13 +451,14 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
             return;
         }
 
-        pivotFollowPoint = localPoint;
-        ApplyPivotFollow();
+        pointerFollowPoint = localPoint;
+        ApplyPointerFollow();
     }
 
     public bool TryRotate(bool clockwise)
     {
-        if (disableRotation || !isDragging) return false;
+        if (inventoryManager != null && inventoryManager.DisableRotation) return false;
+        if (!isDragging) return false;
 
         targetAngleZ += clockwise ? -90f : 90f;
 
@@ -457,7 +477,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     {
         angleZ = z;
         rectTransform.localEulerAngles = new Vector3(0f, 0f, z);
-        ApplyPivotFollow();
+        ApplyPointerFollow();
 
         if (isDragging)
         {
@@ -465,18 +485,23 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         }
     }
 
-    private void ApplyPivotFollow()
+    private void ApplyPointerFollow()
     {
-        Vector2 pivotOffset = GetPivotOffsetInParentSpace();
-        pivotOffset.x *= rectTransform.localScale.x;
-        pivotOffset.y *= rectTransform.localScale.y;
-        rectTransform.anchoredPosition = pivotFollowPoint - pivotOffset;
+        Vector2 grabOffset = GetGrabOffsetInParentSpace();
+        grabOffset.x *= rectTransform.localScale.x;
+        grabOffset.y *= rectTransform.localScale.y;
+        rectTransform.anchoredPosition = pointerFollowPoint - grabOffset;
     }
 
-    private Vector2 GetPivotOffsetInParentSpace()
+    private Vector2 GetGrabOffsetInParentSpace()
     {
-        if (pivotRect == null) return Vector2.zero;
-        return rectTransform.localRotation * (Vector3)pivotRect.anchoredPosition;
+        return rectTransform.localRotation * (Vector3)dragGrabOffsetLocal;
+    }
+
+    public Vector2 GetPivotScreenPosition(Camera eventCamera)
+    {
+        Transform pivot = pivotRect != null ? pivotRect : rectTransform;
+        return RectTransformUtility.WorldToScreenPoint(eventCamera, pivot.position);
     }
 
     private void UpdatePreview(PointerEventData eventData)
