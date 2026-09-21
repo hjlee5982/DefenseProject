@@ -20,6 +20,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI levelText;
     [SerializeField] private GameObject enhancePanel;
     [SerializeField] private EquipSlotView equipSlot;
+    [SerializeField] private GameObject objectsRoot;
     [SerializeField] private Spawner spawner;
     [SerializeField] private PlayerShooter playerShooter;
     [SerializeField] private RoundEventScheduler roundEventScheduler;
@@ -47,6 +48,7 @@ public class GameManager : MonoBehaviour
         spawner.enabled = false;
         playerShooter.enabled = false;
         equipSlot.gameObject.SetActive(false);
+        SetObjectsActive(false);
         ResolveCombatHudPanels();
         ResolveEnhancePanel();
         RefreshCombatHudTexts();
@@ -132,6 +134,7 @@ public class GameManager : MonoBehaviour
         inCombat = true;
         SubscribeCombatEvents();
 
+        SetObjectsActive(true);
         spawner.enabled = true;
         playerShooter.enabled = true;
     }
@@ -146,6 +149,7 @@ public class GameManager : MonoBehaviour
         spawner.enabled = false;
         playerShooter.enabled = false;
         ClearProjectiles();
+        SetObjectsActive(false);
 
         equipSlot.gameObject.SetActive(false);
         SetCombatHudActive(false);
@@ -307,6 +311,11 @@ public class GameManager : MonoBehaviour
         if (expPanel != null) expPanel.SetActive(active);
         if (levelPanel != null) levelPanel.SetActive(active);
         if (expGauge != null) expGauge.gameObject.SetActive(active);
+    }
+
+    private void SetObjectsActive(bool active)
+    {
+        if (objectsRoot != null) objectsRoot.SetActive(active);
     }
 
     private void SetEnhanceActive(bool active)

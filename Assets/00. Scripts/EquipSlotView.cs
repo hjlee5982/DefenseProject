@@ -38,7 +38,10 @@ public class EquipSlotView : MonoBehaviour
             slot.cooldownOverlay.fillAmount = Mathf.Clamp01(fill);
 
             if (slot.cooldownRemaining <= 0f)
+            {
                 slot.cooldownOverlay.fillAmount = 0f;
+                slot.cooldownOverlay.enabled = false;
+            }
         }
     }
 
@@ -61,13 +64,7 @@ public class EquipSlotView : MonoBehaviour
                 continue;
             }
 
-            slot.cooldownRemaining = 0f;
-            slot.cooldownDuration = 0f;
-            if (slot.cooldownOverlay != null)
-            {
-                slot.cooldownOverlay.fillAmount = 0f;
-                slot.cooldownOverlay.enabled = false;
-            }
+            ResetCooldown(slot);
 
             slot.icon.sprite = item.Icon;
             slot.icon.color = item.IconColor;
@@ -81,17 +78,12 @@ public class EquipSlotView : MonoBehaviour
             SlotState slot = slots[slotIndex];
             if (slot.icon == null) continue;
 
-            slot.cooldownRemaining = 0f;
-            slot.cooldownDuration = 0f;
-            if (slot.cooldownOverlay != null)
-            {
-                slot.cooldownOverlay.fillAmount = 0f;
-                slot.cooldownOverlay.enabled = false;
-            }
+            ResetCooldown(slot);
 
             slot.icon.sprite = null;
             slot.icon.color = Color.white;
             slot.icon.enabled = false;
+            UpdateOverlaySprite(slot);
         }
     }
 
@@ -103,109 +95,132 @@ public class EquipSlotView : MonoBehaviour
         SlotState slot = slots[slotIndex];
         if (slot.icon == null || !slot.icon.enabled) return;
 
+        if (slot.cooldownOverlay == null)
+            slot.cooldownOverlay = EnsureCooldownOverlay(slot.icon.transform.parent, slot.icon);
+
+        if (slot.cooldownOverlay == null) return;
+
         slot.cooldownRemaining = duration;
         slot.cooldownDuration = duration;
-        if (slot.cooldownOverlay != null)
-        {
-            slot.cooldownOverlay.enabled = true;
-            slot.cooldownOverlay.fillAmount = 1f;
-        }
+        UpdateOverlaySprite(slot);
+        slot.cooldownOverlay.enabled = true;
+        slot.cooldownOverlay.fillAmount = 1f;
     }
 
     private void InitializeSlots()
     {
-        if (slots != null && slots.Length == transform.childCount) return;
+        if (slots == null || slots.Length != transform.childCount)
+        {
+            slots = new SlotState[transform.childCount];
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                Transform slotRoot = transform.GetChild(i);
+                Image icon = ResolveIconImage(slotRoot);
+                slots[i] = new SlotState
+                {
+                    icon = icon,
+                    cooldownOverlay = EnsureCooldownOverlay(slotRoot, icon)
+                };
+            }
 
-        slots = new SlotState[transform.childCount];
-        for (int i = 0; i < transform.childCount; i++)
+            return;
+        }
+
+        for (int i = 0; i < slots.Length; i++)
         {
             Transform slotRoot = transform.GetChild(i);
-            Image icon = GetOrCreateIcon(slotRoot);
-            slots[i] = new SlotState
-            {
-                icon = icon,
-                cooldownOverlay = EnsureCooldownOverlay(icon)
-            };
+            if (slots[i].icon == null)
+                slots[i].icon = ResolveIconImage(slotRoot);
+            if (slots[i].cooldownOverlay == null)
+                slots[i].cooldownOverlay = EnsureCooldownOverlay(slotRoot, slots[i].icon);
         }
     }
 
-    private static Image GetOrCreateIcon(Transform slotRoot)
+    private static Image ResolveIconImage(Transform slotRoot)
     {
-        Transform misplacedOverlay = slotRoot.Find("CooldownOverlay");
-        if (misplacedOverlay != null)
-            Destroy(misplacedOverlay.gameObject);
-
         Transform iconTransform = slotRoot.Find("Icon");
+        if (iconTransform == null)
+            iconTransform = slotRoot.Find("Image");
+
         if (iconTransform != null)
         {
-            Image existing = iconTransform.GetComponent<Image>();
-            if (existing != null) return existing;
+            Image named = iconTransform.GetComponent<Image>();
+            if (named != null) return named;
         }
 
-        Image rootImage = slotRoot.GetComponent<Image>();
-        if (rootImage != null)
+        for (int i = 0; i < slotRoot.childCount; i++)
         {
-            rootImage.enabled = true;
-            rootImage.sprite = null;
+            Transform child = slotRoot.GetChild(i);
+            if (child.name == "CooldownOverlay") continue;
+
+            Image childImage = child.GetComponent<Image>();
+            if (childImage != null) return childImage;
         }
 
-        GameObject iconObject = new GameObject("Icon", typeof(RectTransform));
-        iconObject.transform.SetParent(slotRoot, false);
-
-        RectTransform rect = iconObject.GetComponent<RectTransform>();
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-
-        Image icon = iconObject.AddComponent<Image>();
-        icon.raycastTarget = false;
-        icon.preserveAspect = true;
-        return icon;
+        return null;
     }
 
-    private Image EnsureCooldownOverlay(Image icon)
+    private Image EnsureCooldownOverlay(Transform slotRoot, Image icon)
     {
-        if (icon == null) return null;
+        if (slotRoot == null || icon == null) return null;
 
-        Transform existing = icon.transform.Find("CooldownOverlay");
+        Transform underIcon = icon.transform.Find("CooldownOverlay");
+        if (underIcon != null)
+            Destroy(underIcon.gameObject);
+
+        Transform existing = slotRoot.Find("CooldownOverlay");
         Image overlay;
         if (existing != null)
         {
             overlay = existing.GetComponent<Image>();
-            if (overlay != null)
-            {
-                overlay.fillClockwise = false;
-                return overlay;
-            }
+            if (overlay == null)
+                overlay = existing.gameObject.AddComponent<Image>();
+        }
+        else
+        {
+            GameObject overlayObject = new GameObject("CooldownOverlay", typeof(RectTransform), typeof(CanvasRenderer));
+            overlayObject.transform.SetParent(slotRoot, false);
+            overlay = overlayObject.AddComponent<Image>();
         }
 
-        GameObject overlayObject = new GameObject("CooldownOverlay", typeof(RectTransform));
-        overlayObject.transform.SetParent(icon.transform, false);
+        RectTransform iconRect = icon.rectTransform;
+        RectTransform rect = overlay.rectTransform;
+        rect.anchorMin = iconRect.anchorMin;
+        rect.anchorMax = iconRect.anchorMax;
+        rect.pivot = iconRect.pivot;
+        rect.anchoredPosition = iconRect.anchoredPosition;
+        rect.sizeDelta = iconRect.sizeDelta;
+        rect.localScale = iconRect.localScale;
+        rect.SetAsLastSibling();
 
-        RectTransform rect = overlayObject.GetComponent<RectTransform>();
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-
-        overlay = overlayObject.AddComponent<Image>();
         overlay.raycastTarget = false;
+        overlay.preserveAspect = icon.preserveAspect;
         overlay.type = Image.Type.Filled;
         overlay.fillMethod = Image.FillMethod.Radial360;
         overlay.fillOrigin = (int)Image.Origin360.Top;
         overlay.fillClockwise = false;
         overlay.fillAmount = 0f;
         overlay.color = cooldownOverlayColor;
+        overlay.sprite = icon.sprite;
         overlay.enabled = false;
         return overlay;
     }
 
-    private static void UpdateOverlaySprite(SlotState slot)
+    private static void ResetCooldown(SlotState slot)
     {
+        slot.cooldownRemaining = 0f;
+        slot.cooldownDuration = 0f;
         if (slot.cooldownOverlay == null) return;
 
-        slot.cooldownOverlay.sprite = slot.icon.sprite;
         slot.cooldownOverlay.fillAmount = 0f;
+        slot.cooldownOverlay.enabled = false;
+    }
+
+    private static void UpdateOverlaySprite(SlotState slot)
+    {
+        if (slot.cooldownOverlay == null || slot.icon == null) return;
+
+        slot.cooldownOverlay.sprite = slot.icon.sprite;
+        slot.cooldownOverlay.preserveAspect = slot.icon.preserveAspect;
     }
 }
