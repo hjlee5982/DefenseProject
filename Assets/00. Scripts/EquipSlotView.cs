@@ -7,12 +7,14 @@ public class EquipSlotView : MonoBehaviour
     private class SlotState
     {
         public Image icon;
+        public Image gradeImage;
         public Image cooldownOverlay;
         public float cooldownRemaining;
         public float cooldownDuration;
     }
 
     [SerializeField] private Color cooldownOverlayColor = new Color(0.2f, 0.2f, 0.2f, 0.75f);
+    [SerializeField] private Color emptyGradeColor = Color.white;
 
     private SlotState[] slots;
 
@@ -69,6 +71,7 @@ public class EquipSlotView : MonoBehaviour
             slot.icon.sprite = item.Icon;
             slot.icon.color = item.IconColor;
             slot.icon.enabled = item.Icon != null;
+            ApplyGradeImage(slot, item.GradeColor, visible: true);
             UpdateOverlaySprite(slot);
             slotIndex++;
         }
@@ -83,6 +86,7 @@ public class EquipSlotView : MonoBehaviour
             slot.icon.sprite = null;
             slot.icon.color = Color.white;
             slot.icon.enabled = false;
+            ApplyGradeImage(slot, emptyGradeColor, visible: false);
             UpdateOverlaySprite(slot);
         }
     }
@@ -119,6 +123,7 @@ public class EquipSlotView : MonoBehaviour
                 slots[i] = new SlotState
                 {
                     icon = icon,
+                    gradeImage = ResolveGradeImage(slotRoot),
                     cooldownOverlay = EnsureCooldownOverlay(slotRoot, icon)
                 };
             }
@@ -131,6 +136,8 @@ public class EquipSlotView : MonoBehaviour
             Transform slotRoot = transform.GetChild(i);
             if (slots[i].icon == null)
                 slots[i].icon = ResolveIconImage(slotRoot);
+            if (slots[i].gradeImage == null)
+                slots[i].gradeImage = ResolveGradeImage(slotRoot);
             if (slots[i].cooldownOverlay == null)
                 slots[i].cooldownOverlay = EnsureCooldownOverlay(slotRoot, slots[i].icon);
         }
@@ -151,13 +158,28 @@ public class EquipSlotView : MonoBehaviour
         for (int i = 0; i < slotRoot.childCount; i++)
         {
             Transform child = slotRoot.GetChild(i);
-            if (child.name == "CooldownOverlay") continue;
+            if (child.name == "CooldownOverlay" || child.name == "Grade") continue;
 
             Image childImage = child.GetComponent<Image>();
             if (childImage != null) return childImage;
         }
 
         return null;
+    }
+
+    private static Image ResolveGradeImage(Transform slotRoot)
+    {
+        Transform gradeTransform = slotRoot.Find("Grade");
+        if (gradeTransform == null) return null;
+        return gradeTransform.GetComponent<Image>();
+    }
+
+    private void ApplyGradeImage(SlotState slot, Color color, bool visible)
+    {
+        if (slot.gradeImage == null) return;
+
+        slot.gradeImage.color = color;
+        slot.gradeImage.enabled = visible;
     }
 
     private Image EnsureCooldownOverlay(Transform slotRoot, Image icon)

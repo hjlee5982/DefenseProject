@@ -68,6 +68,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     public Sprite Icon => icon;
     public Color IconColor => iconColor;
     public int Grade => grade;
+    public Color GradeColor => GetGradeColor();
     public int MaxGrade => gradeColors != null && gradeColors.Length > 0 ? gradeColors.Length : 1;
     public string ShopBanKey => GetTypeKey();
     public string DataId => dataId;

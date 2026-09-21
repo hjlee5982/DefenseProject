@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,7 +17,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject expPanel;
     [SerializeField] private TextMeshProUGUI expText;
     [SerializeField] private Slider expGauge;
-    [SerializeField] private GameObject levelPanel;
+    [SerializeField] private float expGaugeTweenDuration = 0.25f;
     [SerializeField] private TextMeshProUGUI levelText;
     [SerializeField] private GameObject enhancePanel;
     [SerializeField] private EquipSlotView equipSlot;
@@ -42,6 +43,7 @@ public class GameManager : MonoBehaviour
 
     private Button nextButtonComponent;
     private Button[] enhanceButtons;
+    private Tween expGaugeTween;
 
     private void Awake()
     {
@@ -68,6 +70,7 @@ public class GameManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        KillExpGaugeTween();
         UnsubscribeCombatEvents();
         UnwireEnhanceButtons();
         Time.timeScale = 1f;
@@ -240,11 +243,10 @@ public class GameManager : MonoBehaviour
     {
         ResolveSiblingPanel(ref goldPanel, "Gold");
         ResolveSiblingPanel(ref expPanel, "Exp");
-        ResolveSiblingPanel(ref levelPanel, "Level");
         ResolvePanelText(ref goldText, goldPanel);
         ResolvePanelText(ref expText, expPanel);
-        ResolvePanelText(ref levelText, levelPanel);
         ResolveExpGauge();
+        ResolveLevelText();
     }
 
     private void ResolveExpGauge()
@@ -255,6 +257,23 @@ public class GameManager : MonoBehaviour
         Transform found = roundPanel.transform.parent.Find("ExpGauge");
         if (found != null)
             expGauge = found.GetComponent<Slider>();
+    }
+
+    private void ResolveLevelText()
+    {
+        if (levelText != null) return;
+
+        Transform gaugeRoot = expGauge != null
+            ? expGauge.transform
+            : roundPanel != null && roundPanel.transform.parent != null
+                ? roundPanel.transform.parent.Find("ExpGauge")
+                : null;
+        if (gaugeRoot == null) return;
+
+        Transform header = gaugeRoot.Find("Header");
+        if (header == null) return;
+
+        levelText = header.GetComponentInChildren<TextMeshProUGUI>(true);
     }
 
     private void ResolveEnhancePanel()
@@ -309,7 +328,6 @@ public class GameManager : MonoBehaviour
         if (roundPanel != null) roundPanel.SetActive(active);
         if (goldPanel != null) goldPanel.SetActive(active);
         if (expPanel != null) expPanel.SetActive(active);
-        if (levelPanel != null) levelPanel.SetActive(active);
         if (expGauge != null) expGauge.gameObject.SetActive(active);
     }
 
@@ -323,26 +341,64 @@ public class GameManager : MonoBehaviour
         if (enhancePanel != null) enhancePanel.SetActive(active);
     }
 
-    private void RefreshCombatHudTexts()
+    private void RefreshCombatHudTexts(bool animateExpGauge = false, int levelUps = 0)
     {
         if (goldText != null) goldText.text = gold.ToString();
         if (expText != null) expText.text = exp.ToString();
         if (levelText != null) levelText.text = level.ToString();
-        RefreshExpGauge();
+        RefreshExpGauge(animateExpGauge, levelUps);
     }
 
-    private void RefreshExpGauge()
+    private void RefreshExpGauge(bool animate = false, int levelUps = 0)
     {
         if (expGauge == null) return;
 
-        int expToNext = GetExpToNextLevel(level);
-        float normalized = expToNext > 0
-            ? Mathf.Clamp01((float)exp / expToNext)
-            : 0f;
-
         expGauge.minValue = 0f;
         expGauge.maxValue = 1f;
-        expGauge.value = normalized;
+
+        float target = GetNormalizedExp();
+        KillExpGaugeTween();
+
+        if (!animate || !expGauge.gameObject.activeInHierarchy)
+        {
+            expGauge.value = target;
+            return;
+        }
+
+        if (levelUps <= 0)
+        {
+            expGaugeTween = expGauge
+                .DOValue(target, expGaugeTweenDuration)
+                .SetEase(Ease.OutQuad)
+                .SetUpdate(true);
+            return;
+        }
+
+        Sequence sequence = DOTween.Sequence().SetUpdate(true);
+        for (int i = 0; i < levelUps; i++)
+        {
+            sequence.Append(
+                expGauge.DOValue(1f, expGaugeTweenDuration).SetEase(Ease.OutQuad));
+            sequence.AppendCallback(() => expGauge.value = 0f);
+        }
+
+        sequence.Append(
+            expGauge.DOValue(target, expGaugeTweenDuration).SetEase(Ease.OutQuad));
+        expGaugeTween = sequence;
+    }
+
+    private float GetNormalizedExp()
+    {
+        int expToNext = GetExpToNextLevel(level);
+        if (expToNext <= 0) return 0f;
+        return Mathf.Clamp01((float)exp / expToNext);
+    }
+
+    private void KillExpGaugeTween()
+    {
+        if (expGaugeTween == null) return;
+        expGaugeTween.Kill();
+        expGaugeTween = null;
     }
 
     private int GetExpToNextLevel(int currentLevel)
@@ -442,7 +498,7 @@ public class GameManager : MonoBehaviour
             levelUps++;
         }
 
-        RefreshCombatHudTexts();
+        RefreshCombatHudTexts(animateExpGauge: true, levelUps: levelUps);
 
         if (levelUps > 0)
             OpenEnhance(levelUps);

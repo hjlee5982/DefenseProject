@@ -10,6 +10,10 @@ public class Projectile : MonoBehaviour
     [SerializeField] private bool rotateToDirection = true;
     [SerializeField] private float projectileRotationOffset;
     [SerializeField] private float effectRotationOffset;
+    [SerializeField] private bool castShadow = true;
+    [SerializeField] private Vector2 shadowOffset = new Vector2(0.1f, -0.15f);
+    [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
+    [SerializeField] private Vector2 shadowScale = Vector2.one;
 
     private Vector3 direction;
     private Vector3 spawnPosition;
@@ -64,6 +68,9 @@ public class Projectile : MonoBehaviour
             spawnedEffect.PlayMoveLoop();
         else
             spawnedEffect.Play();
+
+        if (castShadow)
+            SpriteShadow.Attach(spawnedEffect.gameObject, shadowOffset, shadowColor, shadowScale);
     }
 
     private void Update()
@@ -136,6 +143,10 @@ public class Projectile : MonoBehaviour
         {
             if (spawnedEffect.UseAnimator)
             {
+                SpriteShadow shadow = spawnedEffect.GetComponent<SpriteShadow>();
+                if (shadow != null)
+                    Destroy(shadow);
+
                 spawnedEffect.transform.SetParent(null);
                 spawnedEffect.PlayEnd();
             }

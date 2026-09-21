@@ -82,7 +82,10 @@ public class Monster : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.GetComponent<Shield>() == null) return;
+        Barrier barrier = other.GetComponent<Barrier>();
+        if (barrier == null) return;
+
+        barrier.ApplyContactHit();
         Die(killed: false);
     }
 
