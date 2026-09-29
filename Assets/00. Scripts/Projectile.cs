@@ -11,7 +11,7 @@ public class Projectile : MonoBehaviour
     [SerializeField] private float projectileRotationOffset;
     [SerializeField] private float effectRotationOffset;
     [SerializeField] private bool castShadow = true;
-    [SerializeField] private Vector2 shadowOffset = new Vector2(0.1f, -0.15f);
+    [SerializeField] private Vector2 shadowOffset = new Vector2(0f, -0.08f);
     [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
     [SerializeField] private Vector2 shadowScale = Vector2.one;
 

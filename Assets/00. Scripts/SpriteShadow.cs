@@ -4,7 +4,7 @@ using UnityEngine;
 public class SpriteShadow : MonoBehaviour
 {
     [SerializeField] private SpriteRenderer source;
-    [SerializeField] private Vector2 offset = new Vector2(0.1f, -0.15f);
+    [SerializeField] private Vector2 offset = new Vector2(0f, -0.08f);
     [SerializeField] private Color color = new Color(0f, 0f, 0f, 0.4f);
     [SerializeField] private Vector2 scale = Vector2.one;
     [SerializeField] private int sortingOrderOffset = -1;

@@ -22934,10 +22934,10 @@ TextureImporter:
       name: UI_870
       rect:
         serializedVersion: 2
-        x: 671
+        x: 672
         y: 352
-        width: 34
-        height: 15
+        width: 16
+        height: 16
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -22957,9 +22957,9 @@ TextureImporter:
       rect:
         serializedVersion: 2
         x: 704
-        y: 353
+        y: 351
         width: 16
-        height: 13
+        height: 16
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -30815,7 +30815,7 @@ TextureImporter:
         width: 30
         height: 8
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 2, y: 3, z: 2, w: 3}
       customData: 
       outline: []

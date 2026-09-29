@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: BatAnimController
+  m_Controller: {fileID: 9100000, guid: 00432394e92f6d0489636a7ef3006ffe, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 7400000, guid: 88884f6596facd44f86e51645a06f96e, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 82b35c9d153c3194e8b49e8030b99d92, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: bfca9dfe0103e2142bd04ada2fe8d653, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 808d1e6f919fe1d40a50e885aaca2ee0, type: 2}

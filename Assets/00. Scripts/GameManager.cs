@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -8,14 +9,9 @@ public class GameManager : MonoBehaviour
 {
     [SerializeField] private InventoryManager inventoryManager;
     [SerializeField] private GameObject nextButton;
-    [SerializeField] private GameObject debugButton;
     [SerializeField] private GameObject uiBackground;
-    [SerializeField] private GameObject roundPanel;
     [SerializeField] private TextMeshProUGUI roundText;
-    [SerializeField] private GameObject goldPanel;
     [SerializeField] private TextMeshProUGUI goldText;
-    [SerializeField] private GameObject expPanel;
-    [SerializeField] private TextMeshProUGUI expText;
     [SerializeField] private Slider expGauge;
     [SerializeField] private float expGaugeTweenDuration = 0.25f;
     [SerializeField] private TextMeshProUGUI levelText;
@@ -59,7 +55,6 @@ public class GameManager : MonoBehaviour
 
         nextButtonComponent = nextButton.GetComponent<Button>();
         nextButtonComponent.onClick.AddListener(OnNextClicked);
-        debugButton.GetComponent<Button>().onClick.AddListener(OnDebugClicked);
         inventoryManager.ExpansionStateChanged += UpdateNextButtonState;
     }
 
@@ -78,11 +73,6 @@ public class GameManager : MonoBehaviour
         {
             inventoryManager.ExpansionStateChanged -= UpdateNextButtonState;
         }
-    }
-
-    private void OnDebugClicked()
-    {
-        inventoryManager.TryRespawnShopItems();
     }
 
     private void OnNextClicked()
@@ -241,61 +231,101 @@ public class GameManager : MonoBehaviour
 
     private void ResolveCombatHudPanels()
     {
-        ResolveSiblingPanel(ref goldPanel, "Gold");
-        ResolveSiblingPanel(ref expPanel, "Exp");
-        ResolvePanelText(ref goldText, goldPanel);
-        ResolvePanelText(ref expText, expPanel);
         ResolveExpGauge();
+        ResolveGoldText();
+        ResolveRoundText();
         ResolveLevelText();
     }
 
     private void ResolveExpGauge()
     {
         if (expGauge != null) return;
-        if (roundPanel == null || roundPanel.transform.parent == null) return;
 
-        Transform found = roundPanel.transform.parent.Find("ExpGauge");
+        Transform found = FindStatusGaugeTransform();
         if (found != null)
             expGauge = found.GetComponent<Slider>();
+    }
+
+    private void ResolveGoldText()
+    {
+        if (goldText != null) return;
+
+        Transform gold = GetStatusGaugeRoot()?.Find("Gold");
+        if (gold == null) return;
+
+        goldText = gold.GetComponentInChildren<TextMeshProUGUI>(true);
+    }
+
+    private void ResolveRoundText()
+    {
+        if (roundText != null) return;
+
+        Transform round = GetStatusGaugeRoot()?.Find("Round");
+        if (round == null) return;
+
+        roundText = round.GetComponentInChildren<TextMeshProUGUI>(true);
+    }
+
+    private Transform GetStatusGaugeRoot()
+    {
+        if (expGauge != null) return expGauge.transform;
+        return FindStatusGaugeTransform();
+    }
+
+    private Transform FindStatusGaugeTransform()
+    {
+        Transform searchRoot = null;
+        if (uiBackground != null && uiBackground.transform.parent != null)
+            searchRoot = uiBackground.transform.parent;
+        else if (uiBackground != null)
+            searchRoot = uiBackground.transform;
+
+        if (searchRoot == null) return null;
+
+        Transform found = FindChildRecursive(searchRoot, "StatusGauge");
+        if (found != null) return found;
+        return FindChildRecursive(searchRoot, "ExpGauge");
+    }
+
+    private static Transform FindChildRecursive(Transform root, string name)
+    {
+        if (root == null) return null;
+        if (root.name == name) return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindChildRecursive(root.GetChild(i), name);
+            if (found != null) return found;
+        }
+
+        return null;
     }
 
     private void ResolveLevelText()
     {
         if (levelText != null) return;
 
-        Transform gaugeRoot = expGauge != null
-            ? expGauge.transform
-            : roundPanel != null && roundPanel.transform.parent != null
-                ? roundPanel.transform.parent.Find("ExpGauge")
-                : null;
-        if (gaugeRoot == null) return;
+        Transform level = GetStatusGaugeRoot()?.Find("Level");
+        if (level == null) return;
 
-        Transform header = gaugeRoot.Find("Header");
-        if (header == null) return;
-
-        levelText = header.GetComponentInChildren<TextMeshProUGUI>(true);
+        levelText = level.GetComponentInChildren<TextMeshProUGUI>(true);
     }
 
     private void ResolveEnhancePanel()
     {
-        ResolveSiblingPanel(ref enhancePanel, "Enhance");
+        if (enhancePanel == null)
+        {
+            Transform gaugeRoot = GetStatusGaugeRoot();
+            Transform parent = gaugeRoot != null ? gaugeRoot.parent : null;
+            if (parent != null)
+            {
+                Transform found = parent.Find("Enhance");
+                if (found != null)
+                    enhancePanel = found.gameObject;
+            }
+        }
+
         WireEnhanceButtons();
-    }
-
-    private void ResolveSiblingPanel(ref GameObject panel, string panelName)
-    {
-        if (panel != null) return;
-        if (roundPanel == null || roundPanel.transform.parent == null) return;
-
-        Transform found = roundPanel.transform.parent.Find(panelName);
-        if (found != null)
-            panel = found.gameObject;
-    }
-
-    private static void ResolvePanelText(ref TextMeshProUGUI text, GameObject panel)
-    {
-        if (text != null || panel == null) return;
-        text = panel.GetComponentInChildren<TextMeshProUGUI>(true);
     }
 
     private void WireEnhanceButtons()
@@ -325,9 +355,6 @@ public class GameManager : MonoBehaviour
 
     private void SetCombatHudActive(bool active)
     {
-        if (roundPanel != null) roundPanel.SetActive(active);
-        if (goldPanel != null) goldPanel.SetActive(active);
-        if (expPanel != null) expPanel.SetActive(active);
         if (expGauge != null) expGauge.gameObject.SetActive(active);
     }
 
@@ -343,8 +370,7 @@ public class GameManager : MonoBehaviour
 
     private void RefreshCombatHudTexts(bool animateExpGauge = false, int levelUps = 0)
     {
-        if (goldText != null) goldText.text = gold.ToString();
-        if (expText != null) expText.text = exp.ToString();
+        if (goldText != null) goldText.text = gold.ToString("N0", CultureInfo.InvariantCulture);
         if (levelText != null) levelText.text = level.ToString();
         RefreshExpGauge(animateExpGauge, levelUps);
     }
