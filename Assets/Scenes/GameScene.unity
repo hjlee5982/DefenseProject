@@ -18131,11 +18131,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Spawner
   debugMode: 1
   monsterPrefabs:
-  - {fileID: 4277262727103678573, guid: 6265cce7a9ec093458e432ea3a4c3301, type: 3}
-  - {fileID: -3089646387071156819, guid: 357b7f4f90b5e58498b53e2d454cbaa1, type: 3}
+  - {fileID: 7210475841481022055, guid: 6265cce7a9ec093458e432ea3a4c3301, type: 3}
   spawnInterval: 0.3
   spawnXRange: 1.5
-  maxSpawnCount: 17
+  maxSpawnCount: 1
 --- !u!114 &6421319682479255897
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -20,6 +20,7 @@ public class Monster : MonoBehaviour
     public static event Action<Monster> Killed;
 
     private static readonly int AttackHash = Animator.StringToHash("Attack");
+    private static readonly int MoveHash = Animator.StringToHash("Move");
 
     private string dataId;
     private int hp;
@@ -27,6 +28,8 @@ public class Monster : MonoBehaviour
     private bool isDead;
     private bool wasKilled;
     private bool isAttacking;
+    private Coroutine barrierAttackRoutine;
+    private Barrier attackTargetBarrier;
     private Animator animator;
     private readonly Dictionary<MonoBehaviour, int> reservations = new();
 
@@ -116,6 +119,12 @@ public class Monster : MonoBehaviour
         if (isDead) return;
         isDead = true;
         wasKilled = killed;
+        attackTargetBarrier = null;
+        if (barrierAttackRoutine != null)
+        {
+            StopCoroutine(barrierAttackRoutine);
+            barrierAttackRoutine = null;
+        }
         Destroy(gameObject);
     }
 
@@ -127,7 +136,7 @@ public class Monster : MonoBehaviour
         if (barrierDetector != null)
         {
             if (barrierDetector.IsTouching(other))
-                BeginBarrierAttack();
+                BeginBarrierAttack(barrier);
             return;
         }
 
@@ -135,13 +144,38 @@ public class Monster : MonoBehaviour
         BeginContactAttackAndDestroy();
     }
 
-    private void BeginBarrierAttack()
+    // Bat_Attack Animation Event
+    public void OnAttackHit()
+    {
+        if (isDead || attackTargetBarrier == null) return;
+        attackTargetBarrier.ApplyContactHit(attackPower);
+    }
+
+    private void BeginBarrierAttack(Barrier barrier)
     {
         if (isDead || isAttacking) return;
 
+        attackTargetBarrier = barrier;
         isAttacking = true;
-        if (animator != null)
+        if (animator == null) return;
+
+        if (barrierAttackRoutine != null)
+            StopCoroutine(barrierAttackRoutine);
+        barrierAttackRoutine = StartCoroutine(BarrierAttackLoop());
+    }
+
+    private IEnumerator BarrierAttackLoop()
+    {
+        while (!isDead)
+        {
             animator.Play(AttackHash, 0, 0f);
+            yield return WaitForAnimation(AttackHash);
+
+            if (isDead) yield break;
+
+            animator.Play(MoveHash, 0, 0f);
+            yield return WaitForAnimation(MoveHash);
+        }
     }
 
     private void BeginContactAttackAndDestroy()
@@ -161,22 +195,25 @@ public class Monster : MonoBehaviour
 
     private IEnumerator DestroyAfterAttackAnimation()
     {
+        yield return WaitForAnimation(AttackHash);
+        Die(killed: false);
+    }
+
+    private IEnumerator WaitForAnimation(int stateHash, float timeout = 3f)
+    {
         yield return null;
 
-        float timeout = 3f;
         while (timeout > 0f)
         {
-            if (animator == null) break;
+            if (animator == null || isDead) yield break;
 
             AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
-            if (info.shortNameHash == AttackHash && info.normalizedTime >= 1f)
-                break;
+            if (info.shortNameHash == stateHash && info.normalizedTime >= 1f)
+                yield break;
 
             timeout -= Time.deltaTime;
             yield return null;
         }
-
-        Die(killed: false);
     }
 
     private void OnDestroy()
