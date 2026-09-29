@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using DG.Tweening;
@@ -15,6 +16,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Slider expGauge;
     [SerializeField] private float expGaugeTweenDuration = 0.25f;
     [SerializeField] private TextMeshProUGUI levelText;
+    [SerializeField] private TextMeshProUGUI shopRoundText;
+    [SerializeField] private TextMeshProUGUI shopLevelText;
+    [SerializeField] private TextMeshProUGUI shopGoldText;
     [SerializeField] private GameObject enhancePanel;
     [SerializeField] private EquipSlotView equipSlot;
     [SerializeField] private GameObject objectsRoot;
@@ -22,7 +26,6 @@ public class GameManager : MonoBehaviour
     [SerializeField] private PlayerShooter playerShooter;
     [SerializeField] private RoundEventScheduler roundEventScheduler;
 
-    private const int GoldPerKill = 1000;
     private const int ExpPerKill = 10;
     private const int DefaultExpToNextLevel = 100;
 
@@ -40,6 +43,23 @@ public class GameManager : MonoBehaviour
     private Button nextButtonComponent;
     private Button[] enhanceButtons;
     private Tween expGaugeTween;
+    private int displayedRound = 1;
+
+    public int Gold => gold;
+    public event Action GoldChanged;
+
+    public bool CanAfford(int amount) => amount <= 0 || gold >= amount;
+
+    public bool TrySpendGold(int amount)
+    {
+        if (amount <= 0) return true;
+        if (gold < amount) return false;
+
+        gold -= amount;
+        RefreshCombatHudTexts();
+        GoldChanged?.Invoke();
+        return true;
+    }
 
     private void Awake()
     {
@@ -128,6 +148,7 @@ public class GameManager : MonoBehaviour
         SubscribeCombatEvents();
 
         SetObjectsActive(true);
+        spawner.SetStageOrder(clearedStageCount);
         spawner.enabled = true;
         playerShooter.enabled = true;
     }
@@ -151,6 +172,7 @@ public class GameManager : MonoBehaviour
         uiBackground.SetActive(true);
 
         clearedStageCount++;
+        displayedRound = clearedStageCount + 1;
         PreparePhaseMode prepareMode = ResolvePreparePhaseMode(clearedStageCount);
         isInitialExpansionPhase = false;
         int expansionUnlockCount = GetExpansionUnlockCount();
@@ -161,6 +183,7 @@ public class GameManager : MonoBehaviour
             inventoryManager.RefreshShop();
         }
 
+        RefreshCombatHudTexts();
         UpdateNextButtonState();
     }
 
@@ -180,6 +203,8 @@ public class GameManager : MonoBehaviour
             inventoryManager.RefreshShop(ensureAtLeastOneWeapon: true);
         }
 
+        displayedRound = clearedStageCount + 1;
+        RefreshCombatHudTexts();
         UpdateNextButtonState();
     }
 
@@ -221,11 +246,8 @@ public class GameManager : MonoBehaviour
 
     private void ShowRound(int round)
     {
-        if (roundText != null)
-        {
-            roundText.text = round.ToString();
-        }
-
+        displayedRound = round;
+        SetRoundTexts(round);
         SetCombatHudActive(true);
     }
 
@@ -235,6 +257,7 @@ public class GameManager : MonoBehaviour
         ResolveGoldText();
         ResolveRoundText();
         ResolveLevelText();
+        ResolveShopStatusTexts();
     }
 
     private void ResolveExpGauge()
@@ -311,6 +334,45 @@ public class GameManager : MonoBehaviour
         levelText = level.GetComponentInChildren<TextMeshProUGUI>(true);
     }
 
+    private void ResolveShopStatusTexts()
+    {
+        if (shopRoundText != null && shopLevelText != null && shopGoldText != null) return;
+
+        Transform shop = inventoryManager != null && inventoryManager.Shop != null
+            ? inventoryManager.Shop.transform
+            : null;
+        Transform status = shop != null ? shop.Find("Status") : null;
+        if (status == null) return;
+
+        if (shopRoundText == null)
+        {
+            Transform round = status.Find("Round");
+            if (round != null)
+                shopRoundText = round.GetComponentInChildren<TextMeshProUGUI>(true);
+        }
+
+        if (shopLevelText == null)
+        {
+            Transform level = status.Find("Level");
+            if (level != null)
+                shopLevelText = level.GetComponentInChildren<TextMeshProUGUI>(true);
+        }
+
+        if (shopGoldText == null)
+        {
+            Transform goldRoot = status.Find("Gold");
+            if (goldRoot != null)
+                shopGoldText = goldRoot.GetComponentInChildren<TextMeshProUGUI>(true);
+        }
+    }
+
+    private void SetRoundTexts(int round)
+    {
+        string text = round.ToString();
+        if (roundText != null) roundText.text = text;
+        if (shopRoundText != null) shopRoundText.text = text;
+    }
+
     private void ResolveEnhancePanel()
     {
         if (enhancePanel == null)
@@ -370,8 +432,17 @@ public class GameManager : MonoBehaviour
 
     private void RefreshCombatHudTexts(bool animateExpGauge = false, int levelUps = 0)
     {
-        if (goldText != null) goldText.text = gold.ToString("N0", CultureInfo.InvariantCulture);
-        if (levelText != null) levelText.text = level.ToString();
+        ResolveShopStatusTexts();
+
+        string goldValue = gold.ToString("N0", CultureInfo.InvariantCulture);
+        if (goldText != null) goldText.text = goldValue;
+        if (shopGoldText != null) shopGoldText.text = goldValue;
+
+        string levelValue = level.ToString();
+        if (levelText != null) levelText.text = levelValue;
+        if (shopLevelText != null) shopLevelText.text = levelValue;
+
+        SetRoundTexts(displayedRound);
         RefreshExpGauge(animateExpGauge, levelUps);
     }
 
@@ -506,12 +577,15 @@ public class GameManager : MonoBehaviour
         aliveMonsters++;
     }
 
-    private void OnMonsterKilled()
+    private void OnMonsterKilled(Monster monster)
     {
         if (!inCombat) return;
 
-        gold += GoldPerKill;
-        exp += ExpPerKill;
+        int gainedGold = monster != null ? Mathf.Max(0, monster.DropGold) : 0;
+        int gainedExp = monster != null ? Mathf.Max(0, monster.DropExp) : ExpPerKill;
+
+        gold += gainedGold;
+        exp += gainedExp;
 
         int levelUps = 0;
         while (true)
@@ -525,6 +599,7 @@ public class GameManager : MonoBehaviour
         }
 
         RefreshCombatHudTexts(animateExpGauge: true, levelUps: levelUps);
+        GoldChanged?.Invoke();
 
         if (levelUps > 0)
             OpenEnhance(levelUps);

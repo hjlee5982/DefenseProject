@@ -7,6 +7,9 @@ public class Monster : MonoBehaviour
 {
     [SerializeField] private float moveSpeed = 2f;
     [SerializeField] private int maxHp = 1;
+    [SerializeField] private int attackPower = 10;
+    [SerializeField] private int dropGold = 1000;
+    [SerializeField] private int dropExp = 10;
     [SerializeField] private bool castShadow = true;
     [SerializeField] private Vector2 shadowOffset = new Vector2(0f, -0.08f);
     [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
@@ -14,10 +17,11 @@ public class Monster : MonoBehaviour
     [SerializeField] private Collider2D barrierDetector;
 
     public static event Action AnyDestroyed;
-    public static event Action Killed;
+    public static event Action<Monster> Killed;
 
     private static readonly int AttackHash = Animator.StringToHash("Attack");
 
+    private string dataId;
     private int hp;
     private int reservedDamage;
     private bool isDead;
@@ -26,13 +30,18 @@ public class Monster : MonoBehaviour
     private Animator animator;
     private readonly Dictionary<MonoBehaviour, int> reservations = new();
 
+    public string DataId => dataId;
     public int Hp => hp;
+    public int AttackPower => attackPower;
+    public int DropGold => dropGold;
+    public int DropExp => dropExp;
     public int ReservedDamage => reservedDamage;
     public int ExpectedRemainingHp => Mathf.Max(0, hp - reservedDamage);
     public bool CanBeTargeted => !isDead && hp > 0 && ExpectedRemainingHp > 0;
 
     private void Awake()
     {
+        ApplyGameData();
         hp = Mathf.Max(1, maxHp);
         animator = GetComponent<Animator>();
 
@@ -122,7 +131,7 @@ public class Monster : MonoBehaviour
             return;
         }
 
-        barrier.ApplyContactHit();
+        barrier.ApplyContactHit(attackPower);
         BeginContactAttackAndDestroy();
     }
 
@@ -173,8 +182,35 @@ public class Monster : MonoBehaviour
     private void OnDestroy()
     {
         CancelInboundProjectiles();
-        if (wasKilled) Killed?.Invoke();
+        if (wasKilled) Killed?.Invoke(this);
         AnyDestroyed?.Invoke();
+    }
+
+    private void ApplyGameData()
+    {
+        if (!GameDataRepository.TryGetMonsterByPrefabKey(GetTypeKey(), out MonsterData monsterData) &&
+            !GameDataRepository.TryGetMonsterById(GetTypeKey(), out monsterData))
+        {
+            return;
+        }
+
+        dataId = monsterData.Id;
+        if (monsterData.Hp > 0) maxHp = monsterData.Hp;
+        if (monsterData.MoveSpeed > 0f) moveSpeed = monsterData.MoveSpeed;
+        if (monsterData.Atk > 0) attackPower = monsterData.Atk;
+        dropGold = Mathf.Max(0, monsterData.Gold);
+        dropExp = Mathf.Max(0, monsterData.Exp);
+    }
+
+    private string GetTypeKey()
+    {
+        string objectName = name;
+        const string cloneSuffix = "(Clone)";
+        int cloneIndex = objectName.IndexOf(cloneSuffix, StringComparison.Ordinal);
+        if (cloneIndex >= 0)
+            objectName = objectName.Substring(0, cloneIndex).TrimEnd();
+
+        return objectName;
     }
 
     private void CancelInboundProjectiles()

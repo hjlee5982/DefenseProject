@@ -50,6 +50,11 @@ public class Barrier : MonoBehaviour
         TakeDamage(contactDamage);
     }
 
+    public void ApplyContactHit(int damage)
+    {
+        TakeDamage(damage > 0 ? damage : contactDamage);
+    }
+
     public void TakeDamage(int amount)
     {
         if (amount <= 0 || hp <= 0) return;

@@ -8,11 +8,22 @@ public static class GameDataRepository
 {
     private const string DefaultRelativePath = "01. Resources/04. Data/GameData.xlsx";
     private const string ItemSheetName = "Item";
+    private const string MonsterSheetName = "Monster";
+    private const string StageSheetName = "Stage";
+    private const string StageSpawnSheetName = "StageSpawn";
 
     private static readonly Dictionary<string, ItemData> ItemsByPrefabKey =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, ItemData> ItemsById =
         new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, MonsterData> MonstersByPrefabKey =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, MonsterData> MonstersById =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, StageData> StagesById =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<int, StageData> StagesByOrder = new();
+    private static readonly List<StageSpawnEntry> StageSpawns = new();
 
     private static bool loaded;
     private static string loadError;
@@ -20,6 +31,7 @@ public static class GameDataRepository
     public static string LoadError => loadError;
     public static bool IsLoaded => loaded;
     public static IReadOnlyDictionary<string, ItemData> Items => ItemsByPrefabKey;
+    public static IReadOnlyDictionary<string, MonsterData> Monsters => MonstersByPrefabKey;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Bootstrap()
@@ -31,6 +43,11 @@ public static class GameDataRepository
     {
         ItemsByPrefabKey.Clear();
         ItemsById.Clear();
+        MonstersByPrefabKey.Clear();
+        MonstersById.Clear();
+        StagesById.Clear();
+        StagesByOrder.Clear();
+        StageSpawns.Clear();
         loaded = false;
         loadError = null;
 
@@ -38,13 +55,25 @@ public static class GameDataRepository
         if (string.IsNullOrEmpty(path))
         {
             loadError = $"xlsx not found. Tried '{DefaultRelativePath}' under Assets/StreamingAssets.";
-            Debug.LogError($"[GameData] Item sheet load failed: {loadError}");
+            Debug.LogError($"[GameData] load failed: {loadError}");
             return;
         }
 
+        LoadItemSheet(path);
+        LoadMonsterSheet(path);
+        LoadStageSheet(path);
+        LoadStageSpawnSheet(path);
+
+        loaded = true;
+        Debug.Log(
+            $"[GameData] Loaded items={ItemsByPrefabKey.Count}, monsters={MonstersById.Count}, " +
+            $"stages={StagesById.Count}, stageSpawns={StageSpawns.Count}");
+    }
+
+    private static void LoadItemSheet(string path)
+    {
         if (!XlsxSheetReader.TryReadSheet(path, ItemSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
-            loadError = error;
             Debug.LogError($"[GameData] Item sheet load failed: {error}");
             return;
         }
@@ -60,9 +89,62 @@ public static class GameDataRepository
             if (!string.IsNullOrWhiteSpace(itemData.Id))
                 ItemsById[itemData.Id] = itemData;
         }
+    }
 
-        loaded = true;
-        Debug.Log($"[GameData] Loaded {ItemsByPrefabKey.Count} item rows from Item sheet.");
+    private static void LoadMonsterSheet(string path)
+    {
+        if (!XlsxSheetReader.TryReadSheet(path, MonsterSheetName, out List<Dictionary<string, string>> rows, out string error))
+        {
+            Debug.LogError($"[GameData] Monster sheet load failed: {error}");
+            return;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (!TryParseMonsterRow(rows[i], out MonsterData monsterData))
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(monsterData.PrefabKey))
+                MonstersByPrefabKey[monsterData.PrefabKey] = monsterData;
+
+            if (!string.IsNullOrWhiteSpace(monsterData.Id))
+                MonstersById[monsterData.Id] = monsterData;
+        }
+    }
+
+    private static void LoadStageSheet(string path)
+    {
+        if (!XlsxSheetReader.TryReadSheet(path, StageSheetName, out List<Dictionary<string, string>> rows, out string error))
+        {
+            Debug.LogError($"[GameData] Stage sheet load failed: {error}");
+            return;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (!TryParseStageRow(rows[i], out StageData stageData))
+                continue;
+
+            StagesById[stageData.Id] = stageData;
+            StagesByOrder[stageData.Order] = stageData;
+        }
+    }
+
+    private static void LoadStageSpawnSheet(string path)
+    {
+        if (!XlsxSheetReader.TryReadSheet(path, StageSpawnSheetName, out List<Dictionary<string, string>> rows, out string error))
+        {
+            Debug.LogError($"[GameData] StageSpawn sheet load failed: {error}");
+            return;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (!TryParseStageSpawnRow(rows[i], out StageSpawnEntry entry))
+                continue;
+
+            StageSpawns.Add(entry);
+        }
     }
 
     private static string ResolveXlsxPath()
@@ -102,6 +184,64 @@ public static class GameDataRepository
         return ItemsById.TryGetValue(id, out itemData);
     }
 
+    public static bool TryGetMonsterByPrefabKey(string prefabKey, out MonsterData monsterData)
+    {
+        EnsureLoaded();
+        if (string.IsNullOrWhiteSpace(prefabKey))
+        {
+            monsterData = null;
+            return false;
+        }
+
+        return MonstersByPrefabKey.TryGetValue(prefabKey, out monsterData);
+    }
+
+    public static bool TryGetMonsterById(string id, out MonsterData monsterData)
+    {
+        EnsureLoaded();
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            monsterData = null;
+            return false;
+        }
+
+        return MonstersById.TryGetValue(id, out monsterData);
+    }
+
+    public static bool TryGetStageByOrder(int order, out StageData stageData)
+    {
+        EnsureLoaded();
+        return StagesByOrder.TryGetValue(order, out stageData);
+    }
+
+    public static bool TryGetStageById(string id, out StageData stageData)
+    {
+        EnsureLoaded();
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            stageData = null;
+            return false;
+        }
+
+        return StagesById.TryGetValue(id, out stageData);
+    }
+
+    public static List<StageSpawnEntry> GetStageSpawnEntries(string stageId)
+    {
+        EnsureLoaded();
+        List<StageSpawnEntry> result = new();
+        if (string.IsNullOrWhiteSpace(stageId)) return result;
+
+        for (int i = 0; i < StageSpawns.Count; i++)
+        {
+            StageSpawnEntry entry = StageSpawns[i];
+            if (string.Equals(entry.StageId, stageId, StringComparison.OrdinalIgnoreCase))
+                result.Add(entry);
+        }
+
+        return result;
+    }
+
     private static void EnsureLoaded()
     {
         if (!loaded && string.IsNullOrEmpty(loadError))
@@ -139,6 +279,67 @@ public static class GameDataRepository
         };
 
         return true;
+    }
+
+    private static bool TryParseMonsterRow(Dictionary<string, string> row, out MonsterData monsterData)
+    {
+        monsterData = null;
+
+        string id = Get(row, "ID", "Id", "MonsterID");
+        string prefabKey = Get(row, "PrefabKey");
+        if (string.IsNullOrWhiteSpace(id) && string.IsNullOrWhiteSpace(prefabKey))
+            return false;
+
+        monsterData = new MonsterData
+        {
+            Id = id?.Trim() ?? string.Empty,
+            Name = Get(row, "Name")?.Trim() ?? string.Empty,
+            PrefabKey = string.IsNullOrWhiteSpace(prefabKey) ? id?.Trim() ?? string.Empty : prefabKey.Trim(),
+            Hp = ParseInt(Get(row, "HP", "Hp", "MaxHp")),
+            MoveSpeed = ParseFloat(Get(row, "MoveSpeed", "Speed")),
+            Atk = ParseInt(Get(row, "Atk", "Attack", "AttackPower", "Damage")),
+            Gold = ParseInt(Get(row, "Gold", "DropGold")),
+            Exp = ParseInt(Get(row, "Exp", "DropExp", "Experience"))
+        };
+
+        return true;
+    }
+
+    private static bool TryParseStageRow(Dictionary<string, string> row, out StageData stageData)
+    {
+        stageData = null;
+
+        string id = Get(row, "ID", "Id", "StageID");
+        if (string.IsNullOrWhiteSpace(id))
+            return false;
+
+        stageData = new StageData
+        {
+            Id = id.Trim(),
+            Order = ParseInt(Get(row, "Order")),
+            SpawnInterval = ParseFloat(Get(row, "SpawnInterval"))
+        };
+
+        return true;
+    }
+
+    private static bool TryParseStageSpawnRow(Dictionary<string, string> row, out StageSpawnEntry entry)
+    {
+        entry = null;
+
+        string stageId = Get(row, "StageID", "StageId", "ID");
+        string monsterId = Get(row, "MonsterID", "MonsterId", "PrefabKey");
+        if (string.IsNullOrWhiteSpace(stageId) || string.IsNullOrWhiteSpace(monsterId))
+            return false;
+
+        entry = new StageSpawnEntry
+        {
+            StageId = stageId.Trim(),
+            MonsterId = monsterId.Trim(),
+            Count = Mathf.Max(0, ParseInt(Get(row, "Count")))
+        };
+
+        return entry.Count > 0;
     }
 
     private static string Get(Dictionary<string, string> row, params string[] keys)

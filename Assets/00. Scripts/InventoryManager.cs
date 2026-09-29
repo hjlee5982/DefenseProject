@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -27,8 +28,14 @@ public class InventoryManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI expansionCountText;
 
     [Header("Optimize")]
-    [SerializeField] private int optimizeAvailableCount = 3;
+    [SerializeField] private int optimizeAvailableCount = 0;
     [SerializeField] private TextMeshProUGUI optimizeCountText;
+
+    [Header("Shop Reroll")]
+    [SerializeField] private int shopRerollCost = 10000;
+    [SerializeField] private TextMeshProUGUI shopRerollCostText;
+    [SerializeField] private Color shopRerollCostAffordableColor = new Color(0.19607843f, 0.19607843f, 0.19607843f, 1f);
+    [SerializeField] private Color shopRerollCostUnaffordableColor = Color.red;
 
     [Header("Drag")]
     [Tooltip("켜면 드래그 시 Pivot이 포인터에 붙습니다. 끄면 처음 잡은 위치가 유지됩니다.")]
@@ -65,6 +72,7 @@ public class InventoryManager : MonoBehaviour
     private readonly List<RaycastResult> raycastResults = new();
     private Item draggingItem;
     private int remainingOptimizeCount;
+    private GameManager gameManager;
 
     public float BagCellSize => Bag.CellSize;
     public RectTransform DragLayer => transform as RectTransform;
@@ -132,8 +140,11 @@ public class InventoryManager : MonoBehaviour
         BindNextButton();
         BindRotateButtons();
         ResolveOptimizeCountText();
+        ResolveShopRerollCostText();
+        ResolveGameManager();
         remainingOptimizeCount = Mathf.Max(0, optimizeAvailableCount);
         UpdateOptimizeCountUI();
+        UpdateShopRerollCostUI();
         UpdateModeActionButtons();
 
         SpawnShopItems();
@@ -141,17 +152,24 @@ public class InventoryManager : MonoBehaviour
 
     private void OnEnable()
     {
+        ResolveGameManager();
+        if (gameManager != null)
+            gameManager.GoldChanged += OnGoldChanged;
         UpdateModeActionButtons();
     }
 
     private void OnDisable()
     {
+        if (gameManager != null)
+            gameManager.GoldChanged -= OnGoldChanged;
         SetButtonActive(rotateButton0, false);
         SetButtonActive(rotateButton1, false);
     }
 
     private void OnDestroy()
     {
+        if (gameManager != null)
+            gameManager.GoldChanged -= OnGoldChanged;
         if (shopRerollButton != null)
             shopRerollButton.onClick.RemoveListener(OnShopRerollClicked);
         if (shopOpenOptimizeButton != null)
@@ -165,9 +183,9 @@ public class InventoryManager : MonoBehaviour
 
     private void BindShopRerollButton()
     {
-        if (shopRerollButton == null && Shop != null)
+        if (shopRerollButton == null)
         {
-            Transform found = Shop.transform.Find("Reroll");
+            Transform found = GetShopContentRoot()?.Find("Reroll");
             if (found != null)
                 shopRerollButton = found.GetComponent<Button>();
         }
@@ -178,9 +196,9 @@ public class InventoryManager : MonoBehaviour
 
     private void BindShopOpenOptimizeButton()
     {
-        if (shopOpenOptimizeButton == null && Shop != null)
+        if (shopOpenOptimizeButton == null)
         {
-            Transform found = Shop.transform.Find("OpenOptimize");
+            Transform found = GetShopContentRoot()?.Find("OpenOptimize");
             if (found != null)
                 shopOpenOptimizeButton = found.GetComponent<Button>();
         }
@@ -191,9 +209,9 @@ public class InventoryManager : MonoBehaviour
 
     private void BindShopOptimizeButton()
     {
-        if (shopOptimizeButton == null && Shop != null)
+        if (shopOptimizeButton == null)
         {
-            Transform found = Shop.transform.Find("Optimize");
+            Transform found = GetShopContentRoot()?.Find("Optimize");
             if (found != null)
                 shopOptimizeButton = found.GetComponent<Button>();
         }
@@ -204,9 +222,9 @@ public class InventoryManager : MonoBehaviour
 
     private void BindShopReturnButton()
     {
-        if (shopReturnButton == null && Shop != null)
+        if (shopReturnButton == null)
         {
-            Transform found = Shop.transform.Find("Return");
+            Transform found = GetShopContentRoot()?.Find("Return");
             if (found != null)
                 shopReturnButton = found.GetComponent<Button>();
         }
@@ -228,7 +246,14 @@ public class InventoryManager : MonoBehaviour
     private void OnShopRerollClicked()
     {
         if (preparePhaseMode != PreparePhaseMode.Normal) return;
+        if (!CanAffordShopReroll()) return;
+
+        ResolveGameManager();
+        if (gameManager != null && !gameManager.TrySpendGold(shopRerollCost))
+            return;
+
         RefreshShop();
+        UpdateShopRerollButtonState();
     }
 
     private void OnShopOpenOptimizeClicked()
@@ -353,6 +378,9 @@ public class InventoryManager : MonoBehaviour
             shopOpenOptimizeButton.interactable = remainingOptimizeCount > 0;
 
         SetButtonActive(shopRerollButton, shopVisible && !optimizeMode);
+        if (shopVisible && !optimizeMode)
+            UpdateShopRerollButtonState();
+
         SetButtonActive(shopOptimizeButton, shopVisible && optimizeMode);
         SetButtonActive(shopReturnButton, shopVisible && optimizeMode);
         if (shopOptimizeButton != null && optimizeMode)
@@ -411,10 +439,17 @@ public class InventoryManager : MonoBehaviour
 
     private void CacheShopSlots()
     {
-        List<RectTransform> slots = new();
-        for (int i = 0; i < Shop.transform.childCount; i++)
+        Transform contentRoot = GetShopContentRoot();
+        if (contentRoot == null)
         {
-            Transform child = Shop.transform.GetChild(i);
+            shopSlots = System.Array.Empty<RectTransform>();
+            return;
+        }
+
+        List<RectTransform> slots = new();
+        for (int i = 0; i < contentRoot.childCount; i++)
+        {
+            Transform child = contentRoot.GetChild(i);
             if (child.GetComponent<Button>() != null) continue;
 
             RectTransform rect = child as RectTransform;
@@ -423,6 +458,14 @@ public class InventoryManager : MonoBehaviour
         }
 
         shopSlots = slots.ToArray();
+    }
+
+    private Transform GetShopContentRoot()
+    {
+        if (Shop == null) return null;
+
+        Transform main = Shop.transform.Find("Main");
+        return main != null ? main : Shop.transform;
     }
 
     private void ResolveOptimizeCountText()
@@ -434,6 +477,58 @@ public class InventoryManager : MonoBehaviour
         if (countTransform == null) return;
 
         optimizeCountText = countTransform.GetComponent<TextMeshProUGUI>();
+    }
+
+    private void ResolveShopRerollCostText()
+    {
+        if (shopRerollCostText != null) return;
+        if (shopRerollButton == null) return;
+
+        Transform goldTransform = shopRerollButton.transform.Find("Gold");
+        if (goldTransform == null) return;
+
+        shopRerollCostText = goldTransform.GetComponent<TextMeshProUGUI>();
+    }
+
+    private void ResolveGameManager()
+    {
+        if (gameManager != null) return;
+        gameManager = FindFirstObjectByType<GameManager>();
+    }
+
+    private void OnGoldChanged()
+    {
+        UpdateShopRerollButtonState();
+    }
+
+    private bool CanAffordShopReroll()
+    {
+        if (shopRerollCost <= 0) return true;
+        ResolveGameManager();
+        if (gameManager == null) return false;
+        return gameManager.CanAfford(shopRerollCost);
+    }
+
+    private void UpdateShopRerollCostUI()
+    {
+        ResolveShopRerollCostText();
+        if (shopRerollCostText == null) return;
+
+        shopRerollCostText.text = shopRerollCost.ToString("N0", CultureInfo.InvariantCulture);
+        shopRerollCostText.color = CanAffordShopReroll()
+            ? shopRerollCostAffordableColor
+            : shopRerollCostUnaffordableColor;
+    }
+
+    private void UpdateShopRerollButtonState()
+    {
+        UpdateShopRerollCostUI();
+
+        if (shopRerollButton == null) return;
+        if (!shopRerollButton.gameObject.activeSelf) return;
+        if (preparePhaseMode != PreparePhaseMode.Normal) return;
+
+        shopRerollButton.interactable = CanAffordShopReroll();
     }
 
     private void UpdateOptimizeCountUI()
