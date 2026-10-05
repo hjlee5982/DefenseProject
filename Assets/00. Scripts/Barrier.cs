@@ -16,12 +16,15 @@ public class Barrier : MonoBehaviour
     [SerializeField] private int contactDamage = 10;
     [SerializeField] private Slider hpGauge;
     [SerializeField] private float hpGaugeTweenDuration = 0.25f;
+    [SerializeField] private Color hpGaugeFullColor = new Color(0.82f, 0.95f, 0.48f, 1f);
+    [SerializeField] private Color hpGaugeEmptyColor = new Color(1f, 0.42f, 0.42f, 1f);
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private Sprite fullHpSprite;
     [SerializeField] private HpSpriteStage[] damagedSprites;
 
     private int hp;
     private Tween hpGaugeTween;
+    private Image hpGaugeFillImage;
 
     public int Hp => hp;
     public int MaxHp => maxHp;
@@ -36,6 +39,8 @@ public class Barrier : MonoBehaviour
         if (fullHpSprite == null && spriteRenderer != null)
             fullHpSprite = spriteRenderer.sprite;
 
+        EnsureHpGaugeColors();
+        ResolveHpGaugeFillImage();
         hp = Mathf.Max(1, maxHp);
         RefreshVisuals(animateGauge: false);
     }
@@ -63,6 +68,12 @@ public class Barrier : MonoBehaviour
         RefreshVisuals(animateGauge: true);
     }
 
+    public void RestoreFullHp()
+    {
+        hp = Mathf.Max(1, maxHp);
+        RefreshVisuals(animateGauge: true);
+    }
+
     private void RefreshVisuals(bool animateGauge)
     {
         RefreshGauge(animateGauge);
@@ -73,6 +84,7 @@ public class Barrier : MonoBehaviour
     {
         if (hpGauge == null) return;
 
+        ResolveHpGaugeFillImage();
         hpGauge.minValue = 0f;
         hpGauge.maxValue = maxHp;
         KillHpGaugeTween();
@@ -80,13 +92,59 @@ public class Barrier : MonoBehaviour
         if (!animate || !hpGauge.gameObject.activeInHierarchy)
         {
             hpGauge.value = hp;
+            ApplyHpGaugeColor(GetHpRatio(hp));
             return;
         }
 
         hpGaugeTween = hpGauge
             .DOValue(hp, hpGaugeTweenDuration)
             .SetEase(Ease.OutQuad)
-            .SetUpdate(true);
+            .SetUpdate(true)
+            .OnUpdate(() => ApplyHpGaugeColor(GetHpRatio(hpGauge.value)));
+    }
+
+    private void ResolveHpGaugeFillImage()
+    {
+        if (hpGaugeFillImage != null) return;
+        if (hpGauge == null || hpGauge.fillRect == null) return;
+
+        hpGaugeFillImage = hpGauge.fillRect.GetComponent<Image>();
+    }
+
+    private void EnsureHpGaugeColors()
+    {
+        // 기존 씬 직렬화로 Color 기본값이 (0,0,0,0)이 된 경우 복구
+        if (hpGaugeFullColor.maxColorComponent <= 0.001f)
+            hpGaugeFullColor = new Color(0.82f, 0.95f, 0.48f, 1f);
+        if (hpGaugeEmptyColor.maxColorComponent <= 0.001f)
+            hpGaugeEmptyColor = new Color(1f, 0.42f, 0.42f, 1f);
+    }
+
+    private float GetHpRatio(float currentHp)
+    {
+        return maxHp <= 0 ? 0f : Mathf.Clamp01(currentHp / maxHp);
+    }
+
+    private void ApplyHpGaugeColor(float ratio)
+    {
+        if (hpGaugeFillImage == null) return;
+        hpGaugeFillImage.color = EvaluateHpGaugeColor(ratio);
+    }
+
+    private Color EvaluateHpGaugeColor(float ratio)
+    {
+        float t = 1f - Mathf.Clamp01(ratio);
+
+        Color.RGBToHSV(hpGaugeFullColor, out float fullH, out float fullS, out float fullV);
+        Color.RGBToHSV(hpGaugeEmptyColor, out float emptyH, out float emptyS, out float emptyV);
+
+        float hue = Mathf.Lerp(fullH, emptyH, t);
+        float saturation = Mathf.Lerp(fullS, emptyS, t);
+        float value = Mathf.Lerp(fullV, emptyV, t);
+
+        Color color = Color.HSVToRGB(hue, saturation, value);
+        color.a = Mathf.Lerp(hpGaugeFullColor.a, hpGaugeEmptyColor.a, t);
+        return color;
     }
 
     private void KillHpGaugeTween()

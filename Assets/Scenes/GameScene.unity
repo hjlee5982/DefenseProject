@@ -3408,7 +3408,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 3c57c827d738fec45a09103df6b80ede, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4571,14 +4571,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.82, g: 0.95, b: 0.48, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -2045707056, guid: f7b267695744e864e98455a19b3c14f5, type: 3}
+  m_Sprite: {fileID: 10907, guid: 0000000000000000f000000000000000, type: 0}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4587,7 +4587,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 0.7
+  m_PixelsPerUnitMultiplier: 3.39
 --- !u!222 &678301280
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -5124,7 +5124,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uACF5\uACA9\uB825\uC774 10% \uC99D\uAC00\uD55C\uB2E4"
+  m_text: Description
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: d928f154504a72f47aeca7dd665c5d8e, type: 2}
   m_sharedMaterial: {fileID: -620179328921754500, guid: d928f154504a72f47aeca7dd665c5d8e, type: 2}
@@ -5413,7 +5413,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uACF5\uACA9\uB825\uC774 10% \uC99D\uAC00\uD55C\uB2E4"
+  m_text: Description
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: d928f154504a72f47aeca7dd665c5d8e, type: 2}
   m_sharedMaterial: {fileID: -620179328921754500, guid: d928f154504a72f47aeca7dd665c5d8e, type: 2}
@@ -5854,7 +5854,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 3c57c827d738fec45a09103df6b80ede, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -9969,7 +9969,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\uACF5\uACA9\uB825\uC774 10% \uC99D\uAC00\uD55C\uB2E4"
+  m_text: Description
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: d928f154504a72f47aeca7dd665c5d8e, type: 2}
   m_sharedMaterial: {fileID: -620179328921754500, guid: d928f154504a72f47aeca7dd665c5d8e, type: 2}
@@ -17021,7 +17021,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 3c57c827d738fec45a09103df6b80ede, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -18132,9 +18132,10 @@ MonoBehaviour:
   debugMode: 1
   monsterPrefabs:
   - {fileID: 7210475841481022055, guid: 6265cce7a9ec093458e432ea3a4c3301, type: 3}
+  - {fileID: 7210475841481022055, guid: b91c9614b4cd17d45b70bf67a8db017a, type: 3}
   spawnInterval: 0.3
   spawnXRange: 1.5
-  maxSpawnCount: 1
+  maxSpawnCount: 10
 --- !u!114 &6421319682479255897
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18151,6 +18152,8 @@ MonoBehaviour:
   contactDamage: 10
   hpGauge: {fileID: 334172979}
   hpGaugeTweenDuration: 0.25
+  hpGaugeFullColor: {r: 0.82, g: 0.95, b: 0.48, a: 1}
+  hpGaugeEmptyColor: {r: 1, g: 0.42, b: 0.42, a: 1}
   spriteRenderer: {fileID: 1822188780026196928}
   fullHpSprite: {fileID: 21300000, guid: d582c4f8cce842d4a8b010b7029e9265, type: 3}
   damagedSprites:

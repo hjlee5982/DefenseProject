@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class Monster : MonoBehaviour
 {
@@ -15,6 +17,10 @@ public class Monster : MonoBehaviour
     [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
     [SerializeField] private Vector2 shadowScale = Vector2.one;
     [SerializeField] private Collider2D barrierDetector;
+    [SerializeField] private Image hpGaugeImage;
+    [SerializeField] private float hpGaugeTweenDuration = 0.25f;
+    [SerializeField] private Color hpGaugeFullColor = new Color(0.82f, 0.95f, 0.48f, 1f);
+    [SerializeField] private Color hpGaugeEmptyColor = new Color(1f, 0.42f, 0.42f, 1f);
 
     public static event Action AnyDestroyed;
     public static event Action<Monster> Killed;
@@ -31,6 +37,8 @@ public class Monster : MonoBehaviour
     private Coroutine barrierAttackRoutine;
     private Barrier attackTargetBarrier;
     private Animator animator;
+    private float displayedHpRatio = 1f;
+    private Tween hpGaugeTween;
     private readonly Dictionary<MonoBehaviour, int> reservations = new();
 
     public string DataId => dataId;
@@ -47,6 +55,7 @@ public class Monster : MonoBehaviour
         ApplyGameData();
         hp = Mathf.Max(1, maxHp);
         animator = GetComponent<Animator>();
+        ResolveHpGaugeImage();
 
         if (barrierDetector == null)
         {
@@ -64,6 +73,17 @@ public class Monster : MonoBehaviour
 
         if (castShadow)
             SpriteShadow.Attach(gameObject, shadowOffset, shadowColor, shadowScale);
+
+        SyncHpGaugeFillDirection();
+        RefreshHpGauge(animate: false);
+    }
+
+    private void OnDestroy()
+    {
+        KillHpGaugeTween();
+        CancelInboundProjectiles();
+        if (wasKilled) Killed?.Invoke(this);
+        AnyDestroyed?.Invoke();
     }
 
     private void Update()
@@ -110,7 +130,8 @@ public class Monster : MonoBehaviour
     {
         if (isDead || amount <= 0 || hp <= 0) return;
 
-        hp -= amount;
+        hp = Mathf.Max(0, hp - amount);
+        RefreshHpGauge(animate: true);
         if (hp <= 0) Die(killed: true);
     }
 
@@ -216,11 +237,88 @@ public class Monster : MonoBehaviour
         }
     }
 
-    private void OnDestroy()
+    private void ResolveHpGaugeImage()
     {
-        CancelInboundProjectiles();
-        if (wasKilled) Killed?.Invoke(this);
-        AnyDestroyed?.Invoke();
+        if (hpGaugeImage != null) return;
+
+        Transform gauge = transform.Find("Canvas/Frame/Gauge");
+        if (gauge == null)
+            gauge = FindChildRecursive(transform, "Gauge");
+        if (gauge == null) return;
+
+        hpGaugeImage = gauge.GetComponent<Image>();
+    }
+
+    private void SyncHpGaugeFillDirection()
+    {
+        ResolveHpGaugeImage();
+        if (hpGaugeImage == null) return;
+
+        // 월드 기준으로 오른쪽에서 왼쪽으로 줄어들도록, 좌우 반전 시 Origin을 보정한다.
+        bool mirrored = transform.lossyScale.x < 0f;
+        hpGaugeImage.fillOrigin = mirrored
+            ? (int)Image.OriginHorizontal.Right
+            : (int)Image.OriginHorizontal.Left;
+    }
+
+    private void RefreshHpGauge(bool animate)
+    {
+        ResolveHpGaugeImage();
+        if (hpGaugeImage == null) return;
+
+        float targetRatio = maxHp <= 0 ? 0f : Mathf.Clamp01((float)hp / maxHp);
+        KillHpGaugeTween();
+
+        if (!animate || !hpGaugeImage.gameObject.activeInHierarchy)
+        {
+            displayedHpRatio = targetRatio;
+            ApplyHpGaugeVisual(displayedHpRatio);
+            return;
+        }
+
+        hpGaugeTween = DOTween.To(
+                () => displayedHpRatio,
+                value =>
+                {
+                    displayedHpRatio = value;
+                    ApplyHpGaugeVisual(displayedHpRatio);
+                },
+                targetRatio,
+                hpGaugeTweenDuration)
+            .SetEase(Ease.OutQuad)
+            .SetUpdate(true)
+            .SetLink(gameObject);
+    }
+
+    private void ApplyHpGaugeVisual(float ratio)
+    {
+        if (hpGaugeImage == null) return;
+
+        hpGaugeImage.fillAmount = Mathf.Clamp01(ratio);
+        hpGaugeImage.color = EvaluateHpGaugeColor(ratio);
+    }
+
+    private Color EvaluateHpGaugeColor(float ratio)
+    {
+        float t = 1f - Mathf.Clamp01(ratio);
+
+        Color.RGBToHSV(hpGaugeFullColor, out float fullH, out float fullS, out float fullV);
+        Color.RGBToHSV(hpGaugeEmptyColor, out float emptyH, out float emptyS, out float emptyV);
+
+        float hue = Mathf.Lerp(fullH, emptyH, t);
+        float saturation = Mathf.Lerp(fullS, emptyS, t);
+        float value = Mathf.Lerp(fullV, emptyV, t);
+
+        Color color = Color.HSVToRGB(hue, saturation, value);
+        color.a = Mathf.Lerp(hpGaugeFullColor.a, hpGaugeEmptyColor.a, t);
+        return color;
+    }
+
+    private void KillHpGaugeTween()
+    {
+        if (hpGaugeTween == null) return;
+        hpGaugeTween.Kill();
+        hpGaugeTween = null;
     }
 
     private void ApplyGameData()
@@ -248,6 +346,20 @@ public class Monster : MonoBehaviour
             objectName = objectName.Substring(0, cloneIndex).TrimEnd();
 
         return objectName;
+    }
+
+    private static Transform FindChildRecursive(Transform root, string childName)
+    {
+        if (root == null) return null;
+        if (root.name == childName) return root;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindChildRecursive(root.GetChild(i), childName);
+            if (found != null) return found;
+        }
+
+        return null;
     }
 
     private void CancelInboundProjectiles()

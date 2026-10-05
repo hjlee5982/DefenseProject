@@ -25,6 +25,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Spawner spawner;
     [SerializeField] private PlayerShooter playerShooter;
     [SerializeField] private RoundEventScheduler roundEventScheduler;
+    [SerializeField] private Barrier barrier;
 
     private const int ExpPerKill = 10;
     private const int DefaultExpToNextLevel = 100;
@@ -42,6 +43,8 @@ public class GameManager : MonoBehaviour
 
     private Button nextButtonComponent;
     private Button[] enhanceButtons;
+    private readonly UnityEngine.Events.UnityAction[] enhanceButtonActions = new UnityEngine.Events.UnityAction[3];
+    private readonly EnhanceOptionData[] currentEnhanceOptions = new EnhanceOptionData[3];
     private Tween expGaugeTween;
     private int displayedRound = 1;
 
@@ -395,10 +398,21 @@ public class GameManager : MonoBehaviour
         UnwireEnhanceButtons();
         if (enhancePanel == null) return;
 
-        enhanceButtons = enhancePanel.GetComponentsInChildren<Button>(true);
-        for (int i = 0; i < enhanceButtons.Length; i++)
+        enhanceButtons = new Button[3];
+        for (int i = 0; i < 3; i++)
         {
-            enhanceButtons[i].onClick.AddListener(OnEnhanceOptionSelected);
+            Transform optionRoot = enhancePanel.transform.Find($"Option_{i}");
+            if (optionRoot == null) continue;
+
+            Button button = optionRoot.Find("Button")?.GetComponent<Button>()
+                            ?? optionRoot.GetComponentInChildren<Button>(true);
+            if (button == null) continue;
+
+            int optionIndex = i;
+            UnityEngine.Events.UnityAction action = () => OnEnhanceOptionSelected(optionIndex);
+            enhanceButtons[i] = button;
+            enhanceButtonActions[i] = action;
+            button.onClick.AddListener(action);
         }
     }
 
@@ -408,8 +422,10 @@ public class GameManager : MonoBehaviour
 
         for (int i = 0; i < enhanceButtons.Length; i++)
         {
-            if (enhanceButtons[i] != null)
-                enhanceButtons[i].onClick.RemoveListener(OnEnhanceOptionSelected);
+            if (enhanceButtons[i] != null && enhanceButtonActions[i] != null)
+                enhanceButtons[i].onClick.RemoveListener(enhanceButtonActions[i]);
+
+            enhanceButtonActions[i] = null;
         }
 
         enhanceButtons = null;
@@ -512,18 +528,63 @@ public class GameManager : MonoBehaviour
         if (isEnhanceOpen) return;
 
         isEnhanceOpen = true;
-        SetEnhanceActive(true);
-        Time.timeScale = 0f;
+        ShowEnhanceChoices();
     }
 
-    private void OnEnhanceOptionSelected()
+    private void OnEnhanceOptionSelected(int optionIndex)
     {
         if (!isEnhanceOpen) return;
 
+        if (optionIndex >= 0 && optionIndex < currentEnhanceOptions.Length)
+            ApplyEnhanceOption(currentEnhanceOptions[optionIndex]);
+
         pendingEnhanceCount = Mathf.Max(0, pendingEnhanceCount - 1);
-        if (pendingEnhanceCount > 0) return;
+        if (pendingEnhanceCount > 0)
+        {
+            ShowEnhanceChoices();
+            return;
+        }
 
         CloseEnhance(force: false);
+    }
+
+    private void ApplyEnhanceOption(EnhanceOptionData option)
+    {
+        if (option == null) return;
+
+        List<EnhanceOptionEffectData> effects = GameDataRepository.GetEnhanceEffects(option.Id);
+        for (int i = 0; i < effects.Count; i++)
+            ApplyEnhanceEffect(effects[i]);
+    }
+
+    private void ApplyEnhanceEffect(EnhanceOptionEffectData effect)
+    {
+        if (effect == null || string.IsNullOrWhiteSpace(effect.EffectType)) return;
+
+        switch (effect.EffectType)
+        {
+            case "RemoveItem":
+                inventoryManager?.AddItemRemoveCount(ParseEffectAmount(effect.Value, 1));
+                break;
+            case "RepairBarrier":
+                ResolveBarrier()?.RestoreFullHp();
+                break;
+        }
+    }
+
+    private Barrier ResolveBarrier()
+    {
+        if (barrier != null) return barrier;
+        barrier = FindAnyObjectByType<Barrier>();
+        return barrier;
+    }
+
+    private static int ParseEffectAmount(string value, int defaultAmount)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return defaultAmount;
+        return int.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
+            ? parsed
+            : defaultAmount;
     }
 
     private void CloseEnhance(bool force)
@@ -541,8 +602,7 @@ public class GameManager : MonoBehaviour
         if (pendingEnhanceCount > 0)
         {
             isEnhanceOpen = true;
-            SetEnhanceActive(true);
-            Time.timeScale = 0f;
+            ShowEnhanceChoices();
             return;
         }
 
@@ -555,6 +615,17 @@ public class GameManager : MonoBehaviour
             pendingReturnToPrepare = false;
             ReturnToPrepare();
         }
+    }
+
+    private void ShowEnhanceChoices()
+    {
+        ResolveEnhancePanel();
+        List<EnhanceOptionData> picked = EnhancePanelFiller.FillRandomOptions(enhancePanel, optionCount: 3);
+        for (int i = 0; i < currentEnhanceOptions.Length; i++)
+            currentEnhanceOptions[i] = i < picked.Count ? picked[i] : null;
+
+        SetEnhanceActive(true);
+        Time.timeScale = 0f;
     }
 
     private void SubscribeCombatEvents()

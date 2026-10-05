@@ -531,6 +531,13 @@ public class InventoryManager : MonoBehaviour
         shopRerollButton.interactable = CanAffordShopReroll();
     }
 
+    public void AddItemRemoveCount(int amount = 1)
+    {
+        if (amount == 0) return;
+        remainingOptimizeCount = Mathf.Max(0, remainingOptimizeCount + amount);
+        UpdateOptimizeCountUI();
+    }
+
     private void UpdateOptimizeCountUI()
     {
         ResolveOptimizeCountText();

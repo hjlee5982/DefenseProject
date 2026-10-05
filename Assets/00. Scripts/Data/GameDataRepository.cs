@@ -11,6 +11,9 @@ public static class GameDataRepository
     private const string MonsterSheetName = "Monster";
     private const string StageSheetName = "Stage";
     private const string StageSpawnSheetName = "StageSpawn";
+    private const string EnhanceOptionSheetName = "EnhanceOption";
+    private const string EnhanceOptionEffectSheetName = "EnhanceOptionEffect";
+    private const string LocalizationSheetName = "Localization";
 
     private static readonly Dictionary<string, ItemData> ItemsByPrefabKey =
         new(StringComparer.OrdinalIgnoreCase);
@@ -24,6 +27,11 @@ public static class GameDataRepository
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<int, StageData> StagesByOrder = new();
     private static readonly List<StageSpawnEntry> StageSpawns = new();
+    private static readonly List<EnhanceOptionData> EnhanceOptions = new();
+    private static readonly Dictionary<string, List<EnhanceOptionEffectData>> EnhanceEffectsByOptionId =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, Dictionary<string, string>> LocalizationByKey =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private static bool loaded;
     private static string loadError;
@@ -32,6 +40,7 @@ public static class GameDataRepository
     public static bool IsLoaded => loaded;
     public static IReadOnlyDictionary<string, ItemData> Items => ItemsByPrefabKey;
     public static IReadOnlyDictionary<string, MonsterData> Monsters => MonstersByPrefabKey;
+    public static IReadOnlyList<EnhanceOptionData> AllEnhanceOptions => EnhanceOptions;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Bootstrap()
@@ -48,6 +57,9 @@ public static class GameDataRepository
         StagesById.Clear();
         StagesByOrder.Clear();
         StageSpawns.Clear();
+        EnhanceOptions.Clear();
+        EnhanceEffectsByOptionId.Clear();
+        LocalizationByKey.Clear();
         loaded = false;
         loadError = null;
 
@@ -63,11 +75,15 @@ public static class GameDataRepository
         LoadMonsterSheet(path);
         LoadStageSheet(path);
         LoadStageSpawnSheet(path);
+        LoadEnhanceOptionSheet(path);
+        LoadEnhanceOptionEffectSheet(path);
+        LoadLocalizationSheet(path);
 
         loaded = true;
         Debug.Log(
             $"[GameData] Loaded items={ItemsByPrefabKey.Count}, monsters={MonstersById.Count}, " +
-            $"stages={StagesById.Count}, stageSpawns={StageSpawns.Count}");
+            $"stages={StagesById.Count}, stageSpawns={StageSpawns.Count}, " +
+            $"enhanceOptions={EnhanceOptions.Count}, localization={LocalizationByKey.Count}");
     }
 
     private static void LoadItemSheet(string path)
@@ -145,6 +161,76 @@ public static class GameDataRepository
 
             StageSpawns.Add(entry);
         }
+    }
+
+    private static void LoadEnhanceOptionSheet(string path)
+    {
+        if (!XlsxSheetReader.TryReadSheet(path, EnhanceOptionSheetName, out List<Dictionary<string, string>> rows, out string error))
+        {
+            Debug.LogError($"[GameData] EnhanceOption sheet load failed: {error}");
+            return;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (!TryParseEnhanceOptionRow(rows[i], out EnhanceOptionData option))
+                continue;
+
+            EnhanceOptions.Add(option);
+        }
+    }
+
+    private static void LoadEnhanceOptionEffectSheet(string path)
+    {
+        if (!XlsxSheetReader.TryReadSheet(path, EnhanceOptionEffectSheetName, out List<Dictionary<string, string>> rows, out string error))
+        {
+            Debug.LogError($"[GameData] EnhanceOptionEffect sheet load failed: {error}");
+            return;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (!TryParseEnhanceOptionEffectRow(rows[i], out EnhanceOptionEffectData effect))
+                continue;
+
+            if (!EnhanceEffectsByOptionId.TryGetValue(effect.OptionId, out List<EnhanceOptionEffectData> list))
+            {
+                list = new List<EnhanceOptionEffectData>();
+                EnhanceEffectsByOptionId[effect.OptionId] = list;
+            }
+
+            list.Add(effect);
+        }
+    }
+
+    private static void LoadLocalizationSheet(string path)
+    {
+        if (!XlsxSheetReader.TryReadSheet(path, LocalizationSheetName, out List<Dictionary<string, string>> rows, out string error))
+        {
+            Debug.LogError($"[GameData] Localization sheet load failed: {error}");
+            return;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            Dictionary<string, string> row = rows[i];
+            string key = CleanCell(Get(row, "Key"));
+            if (string.IsNullOrWhiteSpace(key)) continue;
+
+            Dictionary<string, string> langs = new(StringComparer.OrdinalIgnoreCase);
+            TryAddLocalizationLang(langs, "KR", Get(row, "KR"));
+            TryAddLocalizationLang(langs, "EN", Get(row, "EN"));
+            TryAddLocalizationLang(langs, "CN", Get(row, "CN"));
+            TryAddLocalizationLang(langs, "JP", Get(row, "JP"));
+            LocalizationByKey[key] = langs;
+        }
+    }
+
+    private static void TryAddLocalizationLang(Dictionary<string, string> langs, string lang, string value)
+    {
+        string cleaned = CleanCell(value);
+        if (string.IsNullOrWhiteSpace(cleaned)) return;
+        langs[lang] = cleaned;
     }
 
     private static string ResolveXlsxPath()
@@ -240,6 +326,67 @@ public static class GameDataRepository
         }
 
         return result;
+    }
+
+    public static List<EnhanceOptionEffectData> GetEnhanceEffects(string optionId)
+    {
+        EnsureLoaded();
+        if (string.IsNullOrWhiteSpace(optionId))
+            return new List<EnhanceOptionEffectData>();
+
+        if (!EnhanceEffectsByOptionId.TryGetValue(optionId, out List<EnhanceOptionEffectData> list))
+            return new List<EnhanceOptionEffectData>();
+
+        return new List<EnhanceOptionEffectData>(list);
+    }
+
+    public static bool TryGetLocalization(string key, out string text, string preferredLang = "KR")
+    {
+        EnsureLoaded();
+        text = null;
+        if (string.IsNullOrWhiteSpace(key)) return false;
+        if (!LocalizationByKey.TryGetValue(key.Trim(), out Dictionary<string, string> langs))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(preferredLang) &&
+            langs.TryGetValue(preferredLang, out string preferred) &&
+            !string.IsNullOrWhiteSpace(preferred))
+        {
+            text = preferred;
+            return true;
+        }
+
+        if (langs.TryGetValue("KR", out string kr) && !string.IsNullOrWhiteSpace(kr))
+        {
+            text = kr;
+            return true;
+        }
+
+        foreach (KeyValuePair<string, string> pair in langs)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Value)) continue;
+            text = pair.Value;
+            return true;
+        }
+
+        return false;
+    }
+
+    public static List<EnhanceOptionData> PickRandomEnhanceOptions(int count)
+    {
+        EnsureLoaded();
+        List<EnhanceOptionData> pool = new(EnhanceOptions);
+        if (pool.Count == 0 || count <= 0)
+            return new List<EnhanceOptionData>();
+
+        int pickCount = Mathf.Min(count, pool.Count);
+        for (int i = 0; i < pickCount; i++)
+        {
+            int swapIndex = UnityEngine.Random.Range(i, pool.Count);
+            (pool[i], pool[swapIndex]) = (pool[swapIndex], pool[i]);
+        }
+
+        return pool.GetRange(0, pickCount);
     }
 
     private static void EnsureLoaded()
@@ -342,6 +489,41 @@ public static class GameDataRepository
         return entry.Count > 0;
     }
 
+    private static bool TryParseEnhanceOptionRow(Dictionary<string, string> row, out EnhanceOptionData option)
+    {
+        option = null;
+
+        string id = CleanCell(Get(row, "ID", "Id"));
+        if (string.IsNullOrWhiteSpace(id))
+            return false;
+
+        option = new EnhanceOptionData
+        {
+            Id = id,
+            DescKey = CleanCell(Get(row, "DescKey")),
+            Icon = CleanCell(Get(row, "Icon"))
+        };
+        return true;
+    }
+
+    private static bool TryParseEnhanceOptionEffectRow(Dictionary<string, string> row, out EnhanceOptionEffectData effect)
+    {
+        effect = null;
+
+        string optionId = CleanCell(Get(row, "ID", "Id", "OptionID", "OptionId"));
+        string effectType = CleanCell(Get(row, "EffectType"));
+        if (string.IsNullOrWhiteSpace(optionId) || string.IsNullOrWhiteSpace(effectType))
+            return false;
+
+        effect = new EnhanceOptionEffectData
+        {
+            OptionId = optionId,
+            EffectType = effectType,
+            Value = CleanCell(Get(row, "Value"))
+        };
+        return true;
+    }
+
     private static string Get(Dictionary<string, string> row, params string[] keys)
     {
         for (int i = 0; i < keys.Length; i++)
@@ -351,6 +533,17 @@ public static class GameDataRepository
         }
 
         return string.Empty;
+    }
+
+    private static string CleanCell(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+
+        string cleaned = text.Trim();
+        if (cleaned.Length >= 2 && cleaned[0] == '"' && cleaned[cleaned.Length - 1] == '"')
+            cleaned = cleaned.Substring(1, cleaned.Length - 2).Trim();
+
+        return cleaned;
     }
 
     private static float ParseFloat(string text)
