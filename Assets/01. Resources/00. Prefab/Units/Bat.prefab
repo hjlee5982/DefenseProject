@@ -302,7 +302,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Monster
   moveSpeed: 2
-  maxHp: 1
+  maxHp: 16
   attackPower: 10
   dropGold: 1000
   dropExp: 10
@@ -311,6 +311,10 @@ MonoBehaviour:
   shadowColor: {r: 0, g: 0, b: 0, a: 0.4}
   shadowScale: {x: 1, y: 1}
   barrierDetector: {fileID: 4497516306421713418}
+  hpGaugeImage: {fileID: 0}
+  hpGaugeTweenDuration: 0.25
+  hpGaugeFullColor: {r: 0.82, g: 0.95, b: 0.48, a: 1}
+  hpGaugeEmptyColor: {r: 1, g: 0.42, b: 0.42, a: 1}
 --- !u!50 &3959353105467664432
 Rigidbody2D:
   serializedVersion: 5

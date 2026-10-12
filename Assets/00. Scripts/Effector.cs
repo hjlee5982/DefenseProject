@@ -59,11 +59,13 @@ public class Effector : MonoBehaviour
         animator.Play(MoveStateName, 0, 0f);
     }
 
-    public void PlayOnce()
+    public bool IsPlaying => useAnimator ? (animator != null && animator.enabled && !HasAnimatorClipFinished()) : playing;
+
+    public void PlayOnce(bool destroyWhenDone = true)
     {
         if (useAnimator)
         {
-            PlayEnd();
+            PlayEnd(destroyWhenDone);
             return;
         }
 
@@ -72,42 +74,66 @@ public class Effector : MonoBehaviour
         elapsed = 0f;
         playing = true;
         loop = false;
-        destroyWhenFinished = true;
+        destroyWhenFinished = destroyWhenDone;
         ApplySprite(0);
     }
 
-    public void PlayEnd()
+    public void PlayEnd(bool destroyWhenDone = true)
     {
         if (ending) return;
         ending = true;
 
         if (!useAnimator || animator == null)
         {
-            Destroy(gameObject);
+            if (destroyWhenDone)
+                Destroy(gameObject);
             return;
         }
 
         animator.ResetTrigger(ArrivedHash);
         animator.Play(EndStateName, 0, 0f);
-        StartCoroutine(DestroyAfterEndAnimation());
+        if (destroyWhenDone)
+            StartCoroutine(DestroyAfterEndAnimation());
+    }
+
+    public IEnumerator WaitUntilFinished(float timeout = 5f)
+    {
+        yield return null;
+
+        float remaining = timeout;
+        while (remaining > 0f)
+        {
+            if (this == null) yield break;
+
+            if (useAnimator)
+            {
+                if (HasAnimatorClipFinished())
+                    yield break;
+            }
+            else if (!playing)
+            {
+                yield break;
+            }
+
+            remaining -= Time.deltaTime;
+            yield return null;
+        }
+    }
+
+    private bool HasAnimatorClipFinished()
+    {
+        if (animator == null) return true;
+
+        AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
+        return info.IsName(EndStateName) && info.normalizedTime >= 1f && !animator.IsInTransition(0);
     }
 
     private IEnumerator DestroyAfterEndAnimation()
     {
-        yield return null;
+        yield return WaitUntilFinished(3f);
 
-        float timeout = 3f;
-        while (timeout > 0f)
-        {
-            AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
-            if (info.IsName(EndStateName) && info.normalizedTime >= 1f)
-                break;
-
-            timeout -= Time.deltaTime;
-            yield return null;
-        }
-
-        animator.enabled = false;
+        if (animator != null)
+            animator.enabled = false;
         Destroy(gameObject);
     }
 

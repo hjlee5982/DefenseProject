@@ -39,6 +39,7 @@ public class Monster : MonoBehaviour
     private Animator animator;
     private float displayedHpRatio = 1f;
     private Tween hpGaugeTween;
+    private bool suppressNormalMove;
     private readonly Dictionary<MonoBehaviour, int> reservations = new();
 
     public string DataId => dataId;
@@ -49,6 +50,7 @@ public class Monster : MonoBehaviour
     public int ReservedDamage => reservedDamage;
     public int ExpectedRemainingHp => Mathf.Max(0, hp - reservedDamage);
     public bool CanBeTargeted => !isDead && hp > 0 && ExpectedRemainingHp > 0;
+    public bool IsDead => isDead;
 
     private void Awake()
     {
@@ -88,9 +90,38 @@ public class Monster : MonoBehaviour
 
     private void Update()
     {
-        if (isDead || isAttacking) return;
+        if (isDead) return;
+
+        if (suppressNormalMove)
+        {
+            suppressNormalMove = false;
+            return;
+        }
+
+        if (isAttacking)
+        {
+            ValidateBarrierAttackRange();
+            return;
+        }
 
         transform.Translate(Vector3.down * moveSpeed * Time.deltaTime);
+    }
+
+    public void ApplyConstantWindPull(Vector3 origin, float speed)
+    {
+        if (isDead || speed <= 0f) return;
+
+        suppressNormalMove = true;
+
+        Vector3 toOrigin = origin - transform.position;
+        float distance = toOrigin.magnitude;
+        if (distance > 0.0001f)
+        {
+            float step = speed * Time.deltaTime;
+            transform.position += toOrigin / distance * Mathf.Min(step, distance);
+        }
+
+        ValidateBarrierAttackRange();
     }
 
     public bool TryReserve(MonoBehaviour source, int amount)
@@ -169,6 +200,7 @@ public class Monster : MonoBehaviour
     public void OnAttackHit()
     {
         if (isDead || attackTargetBarrier == null) return;
+        if (!IsInBarrierAttackRange()) return;
         attackTargetBarrier.ApplyContactHit(attackPower);
     }
 
@@ -185,14 +217,66 @@ public class Monster : MonoBehaviour
         barrierAttackRoutine = StartCoroutine(BarrierAttackLoop());
     }
 
+    private void ValidateBarrierAttackRange()
+    {
+        if (!isAttacking || attackTargetBarrier == null) return;
+        if (IsInBarrierAttackRange()) return;
+        CancelBarrierAttack();
+    }
+
+    private bool IsInBarrierAttackRange()
+    {
+        if (attackTargetBarrier == null) return false;
+
+        Collider2D barrierCollider = attackTargetBarrier.GetComponent<Collider2D>();
+        if (barrierCollider == null) return false;
+
+        if (barrierDetector != null)
+            return barrierDetector.IsTouching(barrierCollider);
+
+        Collider2D bodyCollider = GetComponent<Collider2D>();
+        if (bodyCollider != null)
+            return bodyCollider.IsTouching(barrierCollider);
+
+        return false;
+    }
+
+    private void CancelBarrierAttack()
+    {
+        if (!isAttacking) return;
+
+        isAttacking = false;
+        attackTargetBarrier = null;
+
+        if (barrierAttackRoutine != null)
+        {
+            StopCoroutine(barrierAttackRoutine);
+            barrierAttackRoutine = null;
+        }
+
+        if (animator != null)
+            animator.Play(MoveHash, 0, 0f);
+    }
+
     private IEnumerator BarrierAttackLoop()
     {
-        while (!isDead)
+        while (!isDead && isAttacking)
         {
+            if (!IsInBarrierAttackRange())
+            {
+                CancelBarrierAttack();
+                yield break;
+            }
+
             animator.Play(AttackHash, 0, 0f);
             yield return WaitForAnimation(AttackHash);
 
-            if (isDead) yield break;
+            if (isDead || !isAttacking) yield break;
+            if (!IsInBarrierAttackRange())
+            {
+                CancelBarrierAttack();
+                yield break;
+            }
 
             animator.Play(MoveHash, 0, 0f);
             yield return WaitForAnimation(MoveHash);

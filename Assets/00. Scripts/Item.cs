@@ -10,14 +10,18 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 {
     public enum ItemCategory
     {
-        WeaponProjectile,
-        Buff,
-        WeaponInstant
+        Fire,
+        Grimoire,
+        Ice,
+        Water,
+        Wind,
+        Rock,
+        Buff
     }
 
     [SerializeField] private float rotateDuration = 0.15f;
     [SerializeField] private float cellSize = 100f;
-    [SerializeField] private ItemCategory category = ItemCategory.WeaponProjectile;
+    [SerializeField] private ItemCategory category = ItemCategory.Fire;
     [SerializeField] private int grade = 1;
     [SerializeField] private Color[] gradeColors =
     {
@@ -28,7 +32,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         new Color(1f, 0.7f, 0.75f, 1f)
     };
     [SerializeField] private Projectile projectilePrefab;
-    [SerializeField] private InstantAttack instantAttackPrefab;
+    [SerializeField] private Projectile additionalProjectilePrefab;
     [SerializeField] private Sprite icon;
     [SerializeField] private Color iconColor = Color.white;
 
@@ -64,7 +68,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     private bool hasCombatStats;
 
     public Projectile ProjectilePrefab => projectilePrefab;
-    public InstantAttack InstantAttackPrefab => instantAttackPrefab;
+    public Projectile AdditionalProjectilePrefab => additionalProjectilePrefab;
     public Sprite Icon => icon;
     public Color IconColor => iconColor;
     public int Grade => grade;
@@ -78,9 +82,8 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     public float FireInterval => hasCombatStats ? fireInterval : GetFallbackFireInterval();
     public ItemCategory Category => category;
     public bool IsBuff => category == ItemCategory.Buff;
-    public bool IsWeapon => category == ItemCategory.WeaponProjectile || category == ItemCategory.WeaponInstant;
-    public bool IsProjectileWeapon => category == ItemCategory.WeaponProjectile;
-    public bool IsInstantWeapon => category == ItemCategory.WeaponInstant;
+    public bool IsWeapon => !IsBuff;
+    public bool IsProjectileWeapon => IsWeapon && projectilePrefab != null;
 
     private void Awake()
     {
@@ -303,7 +306,6 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 
         dataId = itemData.Id;
         displayName = itemData.Name;
-        ApplyCategoryFromData(itemData);
 
         if (!itemData.HasCombatStats) return;
 
@@ -313,48 +315,19 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         fireInterval = itemData.FireInterval;
     }
 
-    private void ApplyCategoryFromData(ItemData itemData)
-    {
-        string categoryText = itemData.Category;
-        if (string.IsNullOrWhiteSpace(categoryText)) return;
-
-        if (categoryText.Equals("Buff", StringComparison.OrdinalIgnoreCase))
-        {
-            category = ItemCategory.Buff;
-            return;
-        }
-
-        if (!categoryText.Equals("Weapon", StringComparison.OrdinalIgnoreCase))
-            return;
-
-        if (itemData.WeaponType.Equals("Instant", StringComparison.OrdinalIgnoreCase))
-        {
-            category = ItemCategory.WeaponInstant;
-            return;
-        }
-
-        category = ItemCategory.WeaponProjectile;
-    }
-
     private float GetFallbackRange()
     {
-        if (projectilePrefab != null) return projectilePrefab.Range;
-        if (instantAttackPrefab != null) return instantAttackPrefab.Range;
-        return 0f;
+        return projectilePrefab != null ? projectilePrefab.Range : 0f;
     }
 
     private int GetFallbackDamage()
     {
-        if (projectilePrefab != null) return projectilePrefab.Damage;
-        if (instantAttackPrefab != null) return instantAttackPrefab.Damage;
-        return 0;
+        return projectilePrefab != null ? projectilePrefab.Damage : 0;
     }
 
     private float GetFallbackFireInterval()
     {
-        if (projectilePrefab != null) return projectilePrefab.FireInterval;
-        if (instantAttackPrefab != null) return instantAttackPrefab.FireInterval;
-        return 1f;
+        return projectilePrefab != null ? projectilePrefab.FireInterval : 1f;
     }
 
     private void RestoreDragStartState()

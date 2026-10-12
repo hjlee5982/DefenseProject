@@ -56,8 +56,6 @@ public class EquipSlotView : MonoBehaviour
         {
             Item item = items[i];
             if (item == null || !item.IsWeapon) continue;
-            if (item.IsProjectileWeapon && item.ProjectilePrefab == null) continue;
-            if (item.IsInstantWeapon && item.InstantAttackPrefab == null) continue;
 
             SlotState slot = slots[slotIndex];
             if (slot.icon == null)

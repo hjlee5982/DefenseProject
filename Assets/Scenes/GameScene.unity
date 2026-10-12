@@ -1867,30 +1867,30 @@ MonoBehaviour:
   disableRotation: 1
   itemPrefabs:
   - prefab: {fileID: 7421000495332981184, guid: 6baa7d69deb010946bf925dc094a9d90, type: 3}
-    spawnEnabled: 1
-  - prefab: {fileID: 7421000495332981184, guid: 124fb659c2d374a42841682728853875, type: 3}
-    spawnEnabled: 1
-  - prefab: {fileID: 7421000495332981184, guid: db067996508331848b60726dc9bbce1b, type: 3}
-    spawnEnabled: 1
-  - prefab: {fileID: 7421000495332981184, guid: 85b9b65fb29298c48833e581f7207cb1, type: 3}
-    spawnEnabled: 1
-  - prefab: {fileID: 7421000495332981184, guid: b5e6cb2c9aef90d4abdf73e708a3c071, type: 3}
-    spawnEnabled: 1
-  - prefab: {fileID: 7421000495332981184, guid: 80098911cce84fc488889e21d660dfea, type: 3}
-    spawnEnabled: 1
-  - prefab: {fileID: 7421000495332981184, guid: 72316ea37dd3ec94c80e4ed896f29758, type: 3}
-    spawnEnabled: 1
-  - prefab: {fileID: 7421000495332981184, guid: 7bbb5bba4c090d74883cf531769de70c, type: 3}
-    spawnEnabled: 1
+    spawnEnabled: 0
   - prefab: {fileID: 7421000495332981184, guid: 4d7d3fcbfaafe47429f94e63f39c7201, type: 3}
     spawnEnabled: 1
   - prefab: {fileID: 7421000495332981184, guid: 1c73c214596d15746b7b98ba5cce0d4a, type: 3}
     spawnEnabled: 1
-  grade1Chance: 81.9
-  grade2Chance: 14
-  grade3Chance: 3
-  grade4Chance: 1
-  grade5Chance: 0.1
+  - prefab: {fileID: 7421000495332981184, guid: 80098911cce84fc488889e21d660dfea, type: 3}
+    spawnEnabled: 1
+  - prefab: {fileID: 7421000495332981184, guid: 85b9b65fb29298c48833e581f7207cb1, type: 3}
+    spawnEnabled: 0
+  - prefab: {fileID: 7421000495332981184, guid: 124fb659c2d374a42841682728853875, type: 3}
+    spawnEnabled: 0
+  - prefab: {fileID: 7421000495332981184, guid: 7bbb5bba4c090d74883cf531769de70c, type: 3}
+    spawnEnabled: 1
+  - prefab: {fileID: 7421000495332981184, guid: db067996508331848b60726dc9bbce1b, type: 3}
+    spawnEnabled: 0
+  - prefab: {fileID: 7421000495332981184, guid: b5e6cb2c9aef90d4abdf73e708a3c071, type: 3}
+    spawnEnabled: 1
+  - prefab: {fileID: 7421000495332981184, guid: 72316ea37dd3ec94c80e4ed896f29758, type: 3}
+    spawnEnabled: 1
+  grade1Chance: 0
+  grade2Chance: 0
+  grade3Chance: 0
+  grade4Chance: 0
+  grade5Chance: 100
 --- !u!1 &316567223
 GameObject:
   m_ObjectHideFlags: 0
@@ -10992,6 +10992,7 @@ MonoBehaviour:
   spawner: {fileID: 6111059426300919915}
   playerShooter: {fileID: 6982106785543150934}
   roundEventScheduler: {fileID: 1498319672}
+  barrier: {fileID: 0}
 --- !u!114 &1498319672
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -18135,7 +18136,7 @@ MonoBehaviour:
   - {fileID: 7210475841481022055, guid: b91c9614b4cd17d45b70bf67a8db017a, type: 3}
   spawnInterval: 0.3
   spawnXRange: 1.5
-  maxSpawnCount: 10
+  maxSpawnCount: 34
 --- !u!114 &6421319682479255897
 MonoBehaviour:
   m_ObjectHideFlags: 0

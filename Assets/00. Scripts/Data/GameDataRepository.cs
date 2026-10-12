@@ -417,8 +417,6 @@ public static class GameDataRepository
             Id = id?.Trim() ?? string.Empty,
             Name = Get(row, "Name")?.Trim() ?? string.Empty,
             PrefabKey = string.IsNullOrWhiteSpace(prefabKey) ? id?.Trim() ?? string.Empty : prefabKey.Trim(),
-            Category = Get(row, "Category")?.Trim() ?? string.Empty,
-            WeaponType = Get(row, "WeaponType")?.Trim() ?? string.Empty,
             Range = ParseFloat(rangeText),
             Damage = ParseInt(damageText),
             FireInterval = ParseFloat(fireIntervalText),

@@ -6,11 +6,13 @@ public class PlayerShooter : MonoBehaviour
     private struct EquippedWeapon
     {
         public int equipSlotIndex;
+        public int grade;
+        public Item.ItemCategory category;
         public float fireInterval;
         public float range;
         public int damage;
         public Projectile projectilePrefab;
-        public InstantAttack instantAttackPrefab;
+        public Projectile additionalProjectilePrefab;
     }
 
     [SerializeField] private EquipSlotView equipSlotView;
@@ -22,7 +24,6 @@ public class PlayerShooter : MonoBehaviour
     private bool isPlayingAttack;
 
     private static readonly int AttackHash = Animator.StringToHash("Attack");
-    private static readonly int AttackInstantHash = Animator.StringToHash("Attack_Instant");
     private static readonly int IdleHash = Animator.StringToHash("Idle");
 
     private Vector3 FireOrigin => firePoint != null ? firePoint.position : transform.position;
@@ -42,38 +43,23 @@ public class PlayerShooter : MonoBehaviour
         for (int i = 0; i < items.Count; i++)
         {
             Item item = items[i];
-            if (item == null || !item.IsWeapon) continue;
+            if (item == null || item.IsBuff) continue;
 
-            if (item.IsProjectileWeapon)
+            Projectile projectile = item.ProjectilePrefab;
+            if (projectile == null) continue;
+
+            equippedWeapons.Add(new EquippedWeapon
             {
-                Projectile projectile = item.ProjectilePrefab;
-                if (projectile == null) continue;
-
-                equippedWeapons.Add(new EquippedWeapon
-                {
-                    equipSlotIndex = equipSlotIndex,
-                    fireInterval = item.FireInterval,
-                    range = item.Range,
-                    damage = item.Damage,
-                    projectilePrefab = projectile
-                });
-                equipSlotIndex++;
-            }
-            else if (item.IsInstantWeapon)
-            {
-                InstantAttack instantAttack = item.InstantAttackPrefab;
-                if (instantAttack == null) continue;
-
-                equippedWeapons.Add(new EquippedWeapon
-                {
-                    equipSlotIndex = equipSlotIndex,
-                    fireInterval = item.FireInterval,
-                    range = item.Range,
-                    damage = item.Damage,
-                    instantAttackPrefab = instantAttack
-                });
-                equipSlotIndex++;
-            }
+                equipSlotIndex = equipSlotIndex,
+                grade = item.Grade,
+                category = item.Category,
+                fireInterval = item.FireInterval,
+                range = item.Range,
+                damage = item.Damage,
+                projectilePrefab = projectile,
+                additionalProjectilePrefab = item.AdditionalProjectilePrefab
+            });
+            equipSlotIndex++;
         }
 
         weapons = equippedWeapons.ToArray();
@@ -92,12 +78,12 @@ public class PlayerShooter : MonoBehaviour
                 fireTimers[i] += Time.deltaTime;
                 if (fireTimers[i] < weapon.fireInterval) continue;
 
-                Monster target = FindNearestMonsterInRange(weapon.range);
+                Monster target = FindTargetMonsterInRange(weapon);
                 if (target == null) continue;
 
                 if (!TryFire(weapon, target)) continue;
 
-                PlayAttackAnimation(weapon.instantAttackPrefab != null);
+                PlayAttackAnimation();
                 firedThisFrame = true;
                 fireTimers[i] = 0f;
                 if (equipSlotView != null)
@@ -108,11 +94,11 @@ public class PlayerShooter : MonoBehaviour
         TryReturnToIdleAfterAttack(firedThisFrame);
     }
 
-    private void PlayAttackAnimation(bool isInstant)
+    private void PlayAttackAnimation()
     {
         if (animator == null) return;
         isPlayingAttack = true;
-        animator.Play(isInstant ? AttackInstantHash : AttackHash, 0, 0f);
+        animator.Play(AttackHash, 0, 0f);
     }
 
     private void TryReturnToIdleAfterAttack(bool firedThisFrame)
@@ -120,8 +106,7 @@ public class PlayerShooter : MonoBehaviour
         if (animator == null || !isPlayingAttack || firedThisFrame) return;
 
         AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
-        bool isAttackState = info.shortNameHash == AttackHash || info.shortNameHash == AttackInstantHash;
-        if (!isAttackState || info.normalizedTime < 1f) return;
+        if (info.shortNameHash != AttackHash || info.normalizedTime < 1f) return;
         if (CanFireAnyWeapon()) return;
 
         isPlayingAttack = false;
@@ -136,7 +121,7 @@ public class PlayerShooter : MonoBehaviour
         {
             EquippedWeapon weapon = weapons[i];
             if (fireTimers[i] < weapon.fireInterval) continue;
-            if (FindNearestMonsterInRange(weapon.range) != null)
+            if (FindTargetMonsterInRange(weapon) != null)
                 return true;
         }
 
@@ -145,31 +130,24 @@ public class PlayerShooter : MonoBehaviour
 
     private bool TryFire(EquippedWeapon weapon, Monster target)
     {
-        Vector3 origin = FireOrigin;
+        if (weapon.projectilePrefab == null) return false;
 
-        if (weapon.projectilePrefab != null)
-        {
-            Projectile projectile = Instantiate(weapon.projectilePrefab, origin, Quaternion.identity);
-            projectile.ApplyCombatStats(weapon.range, weapon.damage, weapon.fireInterval);
-            if (projectile.Init(target))
-                return true;
+        Projectile projectile = Instantiate(weapon.projectilePrefab, FireOrigin, Quaternion.identity);
+        projectile.ApplyCombatStats(weapon.range, weapon.damage, weapon.fireInterval);
+        projectile.ConfigureAdditionalOnHit(weapon.additionalProjectilePrefab, weapon.grade, weapon.category);
 
-            Destroy(projectile.gameObject);
-            return false;
-        }
+        if (projectile.Init(target))
+            return true;
 
-        if (weapon.instantAttackPrefab != null)
-        {
-            InstantAttack attack = Instantiate(weapon.instantAttackPrefab, origin, Quaternion.identity);
-            attack.ApplyCombatStats(weapon.range, weapon.damage, weapon.fireInterval);
-            if (attack.Init(target, origin))
-                return true;
-
-            Destroy(attack.gameObject);
-            return false;
-        }
-
+        Destroy(projectile.gameObject);
         return false;
+    }
+
+    private Monster FindTargetMonsterInRange(EquippedWeapon weapon)
+    {
+        return weapon.category == Item.ItemCategory.Wind
+            ? FindFarthestMonsterInRange(weapon.range)
+            : FindNearestMonsterInRange(weapon.range);
     }
 
     private Monster FindNearestMonsterInRange(float range)
@@ -191,5 +169,26 @@ public class PlayerShooter : MonoBehaviour
         }
 
         return nearest;
+    }
+
+    private Monster FindFarthestMonsterInRange(float range)
+    {
+        Monster[] monsters = FindObjectsByType<Monster>(FindObjectsSortMode.None);
+        Monster farthest = null;
+        float farthestDistance = -1f;
+
+        for (int i = 0; i < monsters.Length; i++)
+        {
+            Monster monster = monsters[i];
+            if (monster == null || !monster.CanBeTargeted) continue;
+
+            float distance = Vector2.Distance(transform.position, monster.transform.position);
+            if (distance > range || distance <= farthestDistance) continue;
+
+            farthestDistance = distance;
+            farthest = monster;
+        }
+
+        return farthest;
     }
 }
