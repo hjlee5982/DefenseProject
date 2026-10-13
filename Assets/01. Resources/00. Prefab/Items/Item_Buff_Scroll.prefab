@@ -282,7 +282,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Item
   rotateDuration: 0.15
   cellSize: 100
-  category: 5
+  category: 6
   grade: 1
   gradeColors:
   - {r: 0.564, g: 1, b: 0.561, a: 1}

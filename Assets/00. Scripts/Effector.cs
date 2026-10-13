@@ -18,6 +18,7 @@ public class Effector : MonoBehaviour
     private bool playing;
     private bool useAnimator;
     private bool ending;
+    private bool resolved;
 
     private static readonly int ArrivedHash = Animator.StringToHash("Arrived");
     private const string MoveStateName = "Move";
@@ -25,9 +26,8 @@ public class Effector : MonoBehaviour
 
     private void Awake()
     {
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        image = GetComponent<Image>();
-        animator = GetComponent<Animator>();
+        ResolveVisualComponents();
+        SuppressChildEffectors();
         useAnimator = (sprites == null || sprites.Length == 0) && animator != null;
     }
 
@@ -39,13 +39,22 @@ public class Effector : MonoBehaviour
         else Play();
     }
 
-    public bool UseAnimator => useAnimator;
+    public bool UseAnimator
+    {
+        get
+        {
+            EnsureResolved();
+            return useAnimator;
+        }
+    }
 
     public void Play()
     {
+        EnsureResolved();
         if (useAnimator || ending) return;
         if (sprites == null || sprites.Length == 0) return;
 
+        enabled = true;
         elapsed = 0f;
         playing = true;
         ApplySprite(0);
@@ -53,16 +62,28 @@ public class Effector : MonoBehaviour
 
     public void PlayMoveLoop()
     {
+        EnsureResolved();
         if (!useAnimator || animator == null || ending) return;
 
+        enabled = true;
         animator.ResetTrigger(ArrivedHash);
         animator.Play(MoveStateName, 0, 0f);
     }
 
-    public bool IsPlaying => useAnimator ? (animator != null && animator.enabled && !HasAnimatorClipFinished()) : playing;
+    public bool IsPlaying
+    {
+        get
+        {
+            EnsureResolved();
+            return useAnimator
+                ? (animator != null && animator.enabled && !HasAnimatorClipFinished())
+                : playing;
+        }
+    }
 
     public void PlayOnce(bool destroyWhenDone = true)
     {
+        EnsureResolved();
         if (useAnimator)
         {
             PlayEnd(destroyWhenDone);
@@ -71,6 +92,7 @@ public class Effector : MonoBehaviour
 
         if (sprites == null || sprites.Length == 0) return;
 
+        enabled = true;
         elapsed = 0f;
         playing = true;
         loop = false;
@@ -82,14 +104,16 @@ public class Effector : MonoBehaviour
     {
         if (ending) return;
         ending = true;
+        EnsureResolved();
 
         if (!useAnimator || animator == null)
         {
             if (destroyWhenDone)
-                Destroy(gameObject);
+                DestroyEffectRoot();
             return;
         }
 
+        enabled = true;
         animator.ResetTrigger(ArrivedHash);
         animator.Play(EndStateName, 0, 0f);
         if (destroyWhenDone)
@@ -120,6 +144,60 @@ public class Effector : MonoBehaviour
         }
     }
 
+    private void EnsureResolved()
+    {
+        if (resolved) return;
+        ResolveVisualComponents();
+        SuppressChildEffectors();
+        useAnimator = (sprites == null || sprites.Length == 0) && animator != null;
+        resolved = true;
+    }
+
+    private void ResolveVisualComponents()
+    {
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer == null || !spriteRenderer.enabled)
+        {
+            SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null && renderers[i].enabled)
+                {
+                    spriteRenderer = renderers[i];
+                    break;
+                }
+            }
+
+            if (spriteRenderer == null && renderers.Length > 0)
+                spriteRenderer = renderers[0];
+        }
+
+        image = GetComponent<Image>();
+        if (image == null)
+            image = GetComponentInChildren<Image>(true);
+
+        animator = GetComponent<Animator>();
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>(true);
+
+        resolved = true;
+    }
+
+    private void SuppressChildEffectors()
+    {
+        // Nested effect prefabs may have Effector on both root and visual child.
+        // Only the outermost Effector should drive playback/destruction.
+        if (transform.parent != null && transform.parent.GetComponent<Effector>() != null)
+            return;
+
+        Effector[] nested = GetComponentsInChildren<Effector>(true);
+        for (int i = 0; i < nested.Length; i++)
+        {
+            if (nested[i] != null && nested[i] != this)
+                nested[i].enabled = false;
+        }
+    }
+
     private bool HasAnimatorClipFinished()
     {
         if (animator == null) return true;
@@ -134,7 +212,7 @@ public class Effector : MonoBehaviour
 
         if (animator != null)
             animator.enabled = false;
-        Destroy(gameObject);
+        DestroyEffectRoot();
     }
 
     private void Update()
@@ -159,7 +237,7 @@ public class Effector : MonoBehaviour
             {
                 ApplySprite(sprites.Length - 1);
                 playing = false;
-                if (destroyWhenFinished) Destroy(gameObject);
+                if (destroyWhenFinished) DestroyEffectRoot();
                 return;
             }
         }
@@ -170,8 +248,28 @@ public class Effector : MonoBehaviour
 
     private void ApplySprite(int index)
     {
+        if (sprites == null || index < 0 || index >= sprites.Length) return;
+
         Sprite sprite = sprites[index];
-        if (spriteRenderer != null) spriteRenderer.sprite = sprite;
-        if (image != null) image.sprite = sprite;
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.enabled = true;
+            spriteRenderer.sprite = sprite;
+        }
+
+        if (image != null)
+        {
+            image.enabled = true;
+            image.sprite = sprite;
+        }
+    }
+
+    private void DestroyEffectRoot()
+    {
+        Transform root = transform;
+        while (root.parent != null && root.parent.GetComponent<Effector>() != null)
+            root = root.parent;
+
+        Destroy(root.gameObject);
     }
 }

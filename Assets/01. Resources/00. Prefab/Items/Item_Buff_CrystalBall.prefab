@@ -128,8 +128,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Item
   rotateDuration: 0.15
   cellSize: 100
-  category: 5
-  grade: 1
+  category: 6
+  grade: 5
   gradeColors:
   - {r: 0.564, g: 1, b: 0.561, a: 1}
   - {r: 0.65, g: 0.82, b: 1, a: 1}

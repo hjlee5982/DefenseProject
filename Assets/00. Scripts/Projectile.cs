@@ -15,6 +15,12 @@ public class Projectile : MonoBehaviour
     private const float FireAdditionalSideAngleDegrees = 25f;
     private const float WindPullSpeed = 1f;
     private const float WindPullRadius = 3f;
+    private const float WaterKnockbackDistance = 1.25f;
+    private const float WaterKnockbackDuration = 0.15f;
+    private const float RockRootDuration = 1.5f;
+    private const int GrimoireMultiHitCount = 15;
+    private const float GrimoireMultiHitStep = 0.05f;
+    private const float GrimoireHitSpeedReduce = 3f;
 
     [SerializeField] private float range = 5f;
     [SerializeField] private float fireInterval = 1f;
@@ -46,6 +52,13 @@ public class Projectile : MonoBehaviour
     private bool freeFlight;
     private bool instantLinger;
     private bool windPull;
+    private bool rockRootOnHit;
+    private bool grimoireMultiHit;
+    private int multiHitRemaining;
+    private bool multiHitInProgress;
+    private Coroutine grimoireMultiHitRoutine;
+    private Monster grimoireFocusMonster;
+    private bool singleTargetHit;
     private readonly HashSet<Monster> piercedMonsters = new();
     private readonly List<Collider2D> overlapBuffer = new();
 
@@ -79,6 +92,17 @@ public class Projectile : MonoBehaviour
         Item.ItemCategory category)
     {
         sourceCategory = category;
+        grimoireMultiHit = false;
+        multiHitRemaining = 0;
+
+        if (category == Item.ItemCategory.Grimoire && itemGrade >= AdditionalUnlockGrade && !isAdditional)
+        {
+            additionalProjectilePrefab = null;
+            spawnAdditionalOnHit = false;
+            grimoireMultiHit = true;
+            multiHitRemaining = GrimoireMultiHitCount;
+            return;
+        }
 
         if (isAdditional || additionalPrefab == null || itemGrade < AdditionalUnlockGrade)
         {
@@ -100,7 +124,9 @@ public class Projectile : MonoBehaviour
         target = targetMonster;
         freeFlight = false;
         instantLinger = false;
+        singleTargetHit = false;
         spawnPosition = transform.position;
+        piercedMonsters.Clear();
         FaceToward(target.transform.position);
         initialized = true;
         SpawnEffect();
@@ -124,6 +150,7 @@ public class Projectile : MonoBehaviour
         target = null;
         freeFlight = true;
         instantLinger = false;
+        singleTargetHit = false;
         reservationConsumed = true;
         spawnPosition = transform.position;
         piercedMonsters.Clear();
@@ -137,6 +164,7 @@ public class Projectile : MonoBehaviour
         target = null;
         freeFlight = false;
         instantLinger = true;
+        singleTargetHit = false;
         reservationConsumed = true;
         spawnPosition = transform.position;
         piercedMonsters.Clear();
@@ -147,12 +175,93 @@ public class Projectile : MonoBehaviour
         return true;
     }
 
+    public bool InitWaterAdditional(Monster hitMonster)
+    {
+        if (hitMonster == null || hitMonster.IsDead) return false;
+
+        target = hitMonster;
+        freeFlight = false;
+        instantLinger = true;
+        singleTargetHit = true;
+        reservationConsumed = true;
+        spawnPosition = transform.position;
+        piercedMonsters.Clear();
+        piercedMonsters.Add(hitMonster);
+        initialized = true;
+
+        int amount = Mathf.Max(0, damage);
+        if (amount > 0 && hitMonster.CanBeTargeted && hitMonster.TryReserve(this, amount))
+            hitMonster.TryApplyReservedHit(this);
+
+        if (!hitMonster.IsDead)
+            hitMonster.ApplyKnockback(Vector3.up, WaterKnockbackDistance, WaterKnockbackDuration);
+
+        SpawnInstantLingerEffect();
+        StartCoroutine(FinishAfterEffectAnimation());
+        return true;
+    }
+
+    public bool InitRockAdditional()
+    {
+        target = null;
+        freeFlight = false;
+        instantLinger = true;
+        rockRootOnHit = true;
+        singleTargetHit = false;
+        reservationConsumed = true;
+        spawnPosition = transform.position;
+        piercedMonsters.Clear();
+        initialized = true;
+
+        ApplyRockColliderHits();
+        SpawnInstantLingerEffect();
+        StartCoroutine(FinishAfterEffectAnimation());
+        return true;
+    }
+
+    private void ApplyRockColliderHits()
+    {
+        Collider2D myCollider = GetComponent<Collider2D>();
+        if (myCollider == null) return;
+
+        overlapBuffer.Clear();
+        ContactFilter2D filter = new ContactFilter2D
+        {
+            useTriggers = true
+        };
+        filter.NoFilter();
+        Physics2D.OverlapCollider(myCollider, filter, overlapBuffer);
+
+        for (int i = 0; i < overlapBuffer.Count; i++)
+        {
+            Collider2D other = overlapBuffer[i];
+            if (other == null) continue;
+
+            Monster monster = other.GetComponent<Monster>();
+            if (monster != null)
+                TryRockHit(monster);
+        }
+    }
+
+    private void TryRockHit(Monster monster)
+    {
+        if (monster == null || monster.IsDead || !monster.CanBeTargeted) return;
+        if (!piercedMonsters.Add(monster)) return;
+
+        int amount = Mathf.Max(0, damage);
+        if (amount > 0 && monster.TryReserve(this, amount))
+            monster.TryApplyReservedHit(this);
+
+        if (!monster.IsDead)
+            monster.ApplyTemporaryStop(RockRootDuration);
+    }
+
     public void OnTargetLost()
     {
         reservationConsumed = true;
         target = null;
-        if (!instantLinger)
-            Finish();
+        if (multiHitInProgress || instantLinger) return;
+        Finish();
     }
 
     private void SpawnEffect()
@@ -222,7 +331,7 @@ public class Projectile : MonoBehaviour
     {
         if (!initialized || finished) return;
 
-        if (instantLinger)
+        if (instantLinger || multiHitInProgress)
             return;
 
         if (freeFlight)
@@ -276,8 +385,14 @@ public class Projectile : MonoBehaviour
 
         if (instantLinger)
         {
+            if (singleTargetHit) return;
+
             Monster lingerHit = other.GetComponent<Monster>();
-            if (lingerHit != null)
+            if (lingerHit == null) return;
+
+            if (rockRootOnHit)
+                TryRockHit(lingerHit);
+            else
                 TryPierceHit(lingerHit);
             return;
         }
@@ -285,13 +400,23 @@ public class Projectile : MonoBehaviour
         if (freeFlight)
         {
             Monster pierced = other.GetComponent<Monster>();
-            if (pierced != null)
+            if (pierced == null) return;
+
+            if (grimoireMultiHit)
+                ApplyGrimoireMultiHit(pierced);
+            else
                 TryPierceHit(pierced);
             return;
         }
 
         Monster monster = other.GetComponent<Monster>();
         if (monster == null || monster != target) return;
+
+        if (grimoireMultiHit)
+        {
+            ApplyGrimoireMultiHit(monster);
+            return;
+        }
 
         Vector3 hitPosition = transform.position;
         TrySpawnAdditionalProjectile(monster, hitPosition);
@@ -303,6 +428,147 @@ public class Projectile : MonoBehaviour
         }
 
         Finish();
+    }
+
+    private void ApplyGrimoireMultiHit(Monster monster)
+    {
+        if (!grimoireMultiHit || monster == null || monster.IsDead || multiHitRemaining <= 0) return;
+        if (multiHitInProgress || grimoireMultiHitRoutine != null) return;
+
+        grimoireFocusMonster = monster;
+        grimoireMultiHitRoutine = StartCoroutine(GrimoireMultiHitRoutine());
+    }
+
+    private IEnumerator GrimoireMultiHitRoutine()
+    {
+        multiHitInProgress = true;
+        freeFlight = false;
+
+        if (direction.sqrMagnitude <= 0.0001f)
+            direction = Vector3.up;
+        else
+            direction.Normalize();
+
+        float slowSpeed = Mathf.Max(0.1f, moveSpeed - GrimoireHitSpeedReduce);
+
+        // Impact at X: slow to S-k and deal first hit.
+        ApplyGrimoireFocusHit();
+        multiHitRemaining--;
+
+        if (multiHitRemaining <= 0)
+        {
+            EndGrimoireMultiHit(destroyProjectile: true);
+            yield break;
+        }
+
+        if (IsGrimoireFocusDead())
+        {
+            ResumeGrimoireFullSpeed();
+            yield break;
+        }
+
+        float distanceSinceHit = 0f;
+
+        while (multiHitRemaining > 0)
+        {
+            if (finished) yield break;
+
+            if (IsGrimoireFocusDead())
+            {
+                ResumeGrimoireFullSpeed();
+                yield break;
+            }
+
+            float travel = slowSpeed * Time.deltaTime;
+            transform.position += direction * travel;
+            distanceSinceHit += travel;
+            Physics2D.SyncTransforms();
+
+            if (IsOffScreen())
+            {
+                EndGrimoireMultiHit(destroyProjectile: true);
+                yield break;
+            }
+
+            if (distanceSinceHit < GrimoireMultiHitStep)
+            {
+                yield return null;
+                continue;
+            }
+
+            distanceSinceHit -= GrimoireMultiHitStep;
+            ApplyGrimoireFocusHit();
+            multiHitRemaining--;
+
+            if (multiHitRemaining <= 0)
+            {
+                EndGrimoireMultiHit(destroyProjectile: true);
+                yield break;
+            }
+
+            if (IsGrimoireFocusDead())
+            {
+                ResumeGrimoireFullSpeed();
+                yield break;
+            }
+
+            yield return null;
+        }
+
+        EndGrimoireMultiHit(destroyProjectile: true);
+    }
+
+    private void ApplyGrimoireFocusHit()
+    {
+        Monster monster = grimoireFocusMonster;
+        if (monster == null || monster.IsDead || !monster.CanBeTargeted) return;
+
+        int amount = Mathf.Max(0, damage);
+        if (amount <= 0) return;
+
+        TryApplyOneGrimoireHit(monster, amount);
+    }
+
+    private bool TryApplyOneGrimoireHit(Monster monster, int amount)
+    {
+        if (!reservationConsumed && target == monster)
+        {
+            reservationConsumed = true;
+            return monster.TryApplyReservedHit(this);
+        }
+
+        if (!monster.TryReserve(this, amount))
+            return false;
+
+        return monster.TryApplyReservedHit(this);
+    }
+
+    private bool IsGrimoireFocusDead()
+    {
+        return grimoireFocusMonster == null || grimoireFocusMonster.IsDead;
+    }
+
+    private void ResumeGrimoireFullSpeed()
+    {
+        multiHitInProgress = false;
+        grimoireMultiHitRoutine = null;
+        grimoireFocusMonster = null;
+        target = null;
+        freeFlight = true;
+        reservationConsumed = true;
+
+        if (direction.sqrMagnitude <= 0.0001f)
+            direction = Vector3.up;
+    }
+
+    private void EndGrimoireMultiHit(bool destroyProjectile)
+    {
+        multiHitInProgress = false;
+        grimoireMultiHitRoutine = null;
+        grimoireFocusMonster = null;
+
+        if (destroyProjectile && !finished)
+            Finish();
     }
 
     private void TryPierceHit(Monster monster)
@@ -332,6 +598,18 @@ public class Projectile : MonoBehaviour
         if (sourceCategory == Item.ItemCategory.Wind)
         {
             SpawnWindAdditionalProjectile(hitPosition);
+            return;
+        }
+
+        if (sourceCategory == Item.ItemCategory.Water)
+        {
+            SpawnWaterAdditionalProjectile(hitPosition, hitMonster);
+            return;
+        }
+
+        if (sourceCategory == Item.ItemCategory.Rock)
+        {
+            SpawnRockAdditionalProjectile(hitPosition);
             return;
         }
 
@@ -369,6 +647,22 @@ public class Projectile : MonoBehaviour
         additional.ApplyDamage(damage);
         additional.EnableWindPull();
         if (!additional.InitInstantInPlace())
+            Destroy(additional.gameObject);
+    }
+
+    private void SpawnWaterAdditionalProjectile(Vector3 hitPosition, Monster hitMonster)
+    {
+        Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
+        additional.ApplyDamage(damage);
+        if (!additional.InitWaterAdditional(hitMonster))
+            Destroy(additional.gameObject);
+    }
+
+    private void SpawnRockAdditionalProjectile(Vector3 hitPosition)
+    {
+        Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
+        additional.ApplyDamage(damage);
+        if (!additional.InitRockAdditional())
             Destroy(additional.gameObject);
     }
 

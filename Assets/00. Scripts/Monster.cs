@@ -21,12 +21,16 @@ public class Monster : MonoBehaviour
     [SerializeField] private float hpGaugeTweenDuration = 0.25f;
     [SerializeField] private Color hpGaugeFullColor = new Color(0.82f, 0.95f, 0.48f, 1f);
     [SerializeField] private Color hpGaugeEmptyColor = new Color(1f, 0.42f, 0.42f, 1f);
+    [SerializeField] private int hitFlashCount = 3;
+    [SerializeField] private float hitFlashInterval = 0.08f;
 
     public static event Action AnyDestroyed;
     public static event Action<Monster> Killed;
 
     private static readonly int AttackHash = Animator.StringToHash("Attack");
     private static readonly int MoveHash = Animator.StringToHash("Move");
+    private static readonly int FlashAmountId = Shader.PropertyToID("_FlashAmount");
+    private const string HitFlashShaderName = "Defense/SpriteHitFlash";
 
     private string dataId;
     private int hp;
@@ -34,12 +38,22 @@ public class Monster : MonoBehaviour
     private bool isDead;
     private bool wasKilled;
     private bool isAttacking;
+    private bool waitingHitFlashBeforeDestroy;
     private Coroutine barrierAttackRoutine;
     private Barrier attackTargetBarrier;
     private Animator animator;
+    private SpriteRenderer bodyRenderer;
+    private Material originalSharedMaterial;
+    private Material hitFlashMaterial;
     private float displayedHpRatio = 1f;
     private Tween hpGaugeTween;
+    private Tween hitFlashTween;
+    private Tween knockbackTween;
     private bool suppressNormalMove;
+    private bool isKnockback;
+    private bool isMovementStopped;
+    private Coroutine temporaryStopRoutine;
+    private float animatorSpeedBeforeStop = 1f;
     private readonly Dictionary<MonoBehaviour, int> reservations = new();
 
     public string DataId => dataId;
@@ -57,6 +71,9 @@ public class Monster : MonoBehaviour
         ApplyGameData();
         hp = Mathf.Max(1, maxHp);
         animator = GetComponent<Animator>();
+        bodyRenderer = GetComponent<SpriteRenderer>();
+        if (bodyRenderer != null)
+            originalSharedMaterial = bodyRenderer.sharedMaterial;
         ResolveHpGaugeImage();
 
         if (barrierDetector == null)
@@ -83,6 +100,20 @@ public class Monster : MonoBehaviour
     private void OnDestroy()
     {
         KillHpGaugeTween();
+        KillHitFlashTween(restoreMaterial: false);
+        KillKnockbackTween();
+        if (temporaryStopRoutine != null)
+        {
+            StopCoroutine(temporaryStopRoutine);
+            temporaryStopRoutine = null;
+        }
+
+        if (hitFlashMaterial != null)
+        {
+            Destroy(hitFlashMaterial);
+            hitFlashMaterial = null;
+        }
+
         CancelInboundProjectiles();
         if (wasKilled) Killed?.Invoke(this);
         AnyDestroyed?.Invoke();
@@ -91,6 +122,12 @@ public class Monster : MonoBehaviour
     private void Update()
     {
         if (isDead) return;
+
+        if (isKnockback)
+            return;
+
+        if (isMovementStopped)
+            return;
 
         if (suppressNormalMove)
         {
@@ -107,9 +144,38 @@ public class Monster : MonoBehaviour
         transform.Translate(Vector3.down * moveSpeed * Time.deltaTime);
     }
 
+    public void ApplyTemporaryStop(float duration)
+    {
+        if (isDead || duration <= 0f) return;
+
+        if (temporaryStopRoutine != null)
+            StopCoroutine(temporaryStopRoutine);
+
+        temporaryStopRoutine = StartCoroutine(TemporaryStopRoutine(duration));
+    }
+
+    private IEnumerator TemporaryStopRoutine(float duration)
+    {
+        isMovementStopped = true;
+
+        if (animator != null)
+        {
+            animatorSpeedBeforeStop = animator.speed;
+            animator.speed = 0f;
+        }
+
+        yield return new WaitForSeconds(duration);
+
+        isMovementStopped = false;
+        if (animator != null)
+            animator.speed = animatorSpeedBeforeStop;
+
+        temporaryStopRoutine = null;
+    }
+
     public void ApplyConstantWindPull(Vector3 origin, float speed)
     {
-        if (isDead || speed <= 0f) return;
+        if (isDead || isKnockback || isMovementStopped || speed <= 0f) return;
 
         suppressNormalMove = true;
 
@@ -122,6 +188,40 @@ public class Monster : MonoBehaviour
         }
 
         ValidateBarrierAttackRange();
+    }
+
+    public void ApplyKnockback(Vector3 direction, float distance, float duration = 0.15f)
+    {
+        if (isDead || distance <= 0f) return;
+        if (direction.sqrMagnitude <= 0.0001f) return;
+
+        KillKnockbackTween();
+        isKnockback = true;
+
+        Vector3 targetPosition = transform.position + direction.normalized * distance;
+        knockbackTween = transform.DOMove(targetPosition, Mathf.Max(0.01f, duration))
+            .SetEase(Ease.OutQuad)
+            .SetUpdate(true)
+            .SetLink(gameObject)
+            .OnComplete(() =>
+            {
+                isKnockback = false;
+                knockbackTween = null;
+                ValidateBarrierAttackRange();
+            })
+            .OnKill(() =>
+            {
+                isKnockback = false;
+                knockbackTween = null;
+            });
+    }
+
+    private void KillKnockbackTween()
+    {
+        if (knockbackTween == null) return;
+        knockbackTween.Kill();
+        knockbackTween = null;
+        isKnockback = false;
     }
 
     public bool TryReserve(MonoBehaviour source, int amount)
@@ -163,21 +263,128 @@ public class Monster : MonoBehaviour
 
         hp = Mathf.Max(0, hp - amount);
         RefreshHpGauge(animate: true);
-        if (hp <= 0) Die(killed: true);
+
+        bool lethal = hp <= 0;
+        if (lethal)
+            BeginDeath(killed: true);
+
+        PlayHitFlash(lethal ? FinalizeDeath : null);
     }
 
-    private void Die(bool killed)
+    private void PlayHitFlash(Action onComplete = null)
+    {
+        if (bodyRenderer == null || hitFlashCount <= 0 || !EnsureHitFlashMaterial())
+        {
+            onComplete?.Invoke();
+            return;
+        }
+
+        KillHitFlashTween(restoreMaterial: false);
+        bodyRenderer.sharedMaterial = hitFlashMaterial;
+        SetFlashAmount(0f);
+
+        Sequence sequence = DOTween.Sequence();
+        for (int i = 0; i < hitFlashCount; i++)
+        {
+            sequence.AppendCallback(() => SetFlashAmount(1f));
+            sequence.AppendInterval(hitFlashInterval);
+            sequence.AppendCallback(() => SetFlashAmount(0f));
+            sequence.AppendInterval(hitFlashInterval);
+        }
+
+        sequence.OnComplete(() =>
+        {
+            hitFlashTween = null;
+            RestoreOriginalMaterial();
+            onComplete?.Invoke();
+        });
+        sequence.OnKill(() =>
+        {
+            if (!waitingHitFlashBeforeDestroy)
+                RestoreOriginalMaterial();
+        });
+
+        hitFlashTween = sequence
+            .SetUpdate(true)
+            .SetLink(gameObject);
+    }
+
+    private bool EnsureHitFlashMaterial()
+    {
+        if (hitFlashMaterial != null) return true;
+
+        Shader shader = Shader.Find(HitFlashShaderName);
+        if (shader == null)
+        {
+            Debug.LogWarning($"[{name}] Missing shader '{HitFlashShaderName}'. Hit flash skipped.", this);
+            return false;
+        }
+
+        hitFlashMaterial = new Material(shader);
+        return true;
+    }
+
+    private void SetFlashAmount(float amount)
+    {
+        if (hitFlashMaterial == null) return;
+        hitFlashMaterial.SetFloat(FlashAmountId, amount);
+    }
+
+    private void RestoreOriginalMaterial()
+    {
+        if (bodyRenderer == null) return;
+        bodyRenderer.sharedMaterial = originalSharedMaterial;
+        SetFlashAmount(0f);
+    }
+
+    private void KillHitFlashTween(bool restoreMaterial)
+    {
+        if (hitFlashTween != null)
+        {
+            hitFlashTween.Kill();
+            hitFlashTween = null;
+        }
+
+        if (restoreMaterial)
+            RestoreOriginalMaterial();
+        else
+            SetFlashAmount(0f);
+    }
+
+    private void BeginDeath(bool killed)
     {
         if (isDead) return;
+
         isDead = true;
         wasKilled = killed;
+        waitingHitFlashBeforeDestroy = true;
         attackTargetBarrier = null;
+        isAttacking = false;
+
         if (barrierAttackRoutine != null)
         {
             StopCoroutine(barrierAttackRoutine);
             barrierAttackRoutine = null;
         }
+
+        Collider2D[] colliders = GetComponentsInChildren<Collider2D>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+                colliders[i].enabled = false;
+        }
+    }
+
+    private void FinalizeDeath()
+    {
+        waitingHitFlashBeforeDestroy = false;
         Destroy(gameObject);
+    }
+
+    private void Die(bool killed)
+    {
+        BeginDeath(killed);
+        FinalizeDeath();
     }
 
     private void OnTriggerEnter2D(Collider2D other)

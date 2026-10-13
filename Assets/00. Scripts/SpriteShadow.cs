@@ -10,6 +10,7 @@ public class SpriteShadow : MonoBehaviour
     [SerializeField] private int sortingOrderOffset = -1;
 
     private SpriteRenderer shadowRenderer;
+    private Material shadowSharedMaterial;
 
     public static SpriteShadow Attach(GameObject target, Vector2 offset, Color color, Vector2 scale)
     {
@@ -49,6 +50,9 @@ public class SpriteShadow : MonoBehaviour
             source = GetComponent<SpriteRenderer>();
         if (source == null) return;
 
+        if (shadowSharedMaterial == null)
+            shadowSharedMaterial = source.sharedMaterial;
+
         if (shadowRenderer == null)
         {
             Transform existing = transform.Find("Shadow");
@@ -56,22 +60,34 @@ public class SpriteShadow : MonoBehaviour
                 shadowRenderer = existing.GetComponent<SpriteRenderer>();
         }
 
-        if (shadowRenderer != null) return;
+        if (shadowRenderer != null)
+        {
+            if (shadowSharedMaterial != null)
+                shadowRenderer.sharedMaterial = shadowSharedMaterial;
+            return;
+        }
 
         GameObject shadowObject = new GameObject("Shadow");
         shadowObject.transform.SetParent(transform, false);
         shadowObject.transform.SetAsFirstSibling();
         shadowRenderer = shadowObject.AddComponent<SpriteRenderer>();
+        if (shadowSharedMaterial != null)
+            shadowRenderer.sharedMaterial = shadowSharedMaterial;
     }
 
     private void Sync()
     {
         if (source == null || shadowRenderer == null) return;
 
+        // Keep the original material so hit-flash material swaps on the body
+        // do not make the shadow flash/white as well.
+        if (shadowSharedMaterial == null)
+            shadowSharedMaterial = source.sharedMaterial;
+
         shadowRenderer.sprite = source.sprite;
         shadowRenderer.flipX = source.flipX;
         shadowRenderer.flipY = source.flipY;
-        shadowRenderer.sharedMaterial = source.sharedMaterial;
+        shadowRenderer.sharedMaterial = shadowSharedMaterial;
         shadowRenderer.color = color;
         shadowRenderer.sortingLayerID = source.sortingLayerID;
         shadowRenderer.sortingOrder = source.sortingOrder + sortingOrderOffset;

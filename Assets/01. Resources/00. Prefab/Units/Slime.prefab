@@ -246,6 +246,8 @@ MonoBehaviour:
   hpGaugeTweenDuration: 0.25
   hpGaugeFullColor: {r: 0.82, g: 0.95, b: 0.48, a: 1}
   hpGaugeEmptyColor: {r: 1, g: 0.42, b: 0.42, a: 1}
+  hitFlashCount: 3
+  hitFlashInterval: 0.08
 --- !u!50 &3959353105467664432
 Rigidbody2D:
   serializedVersion: 5
