@@ -1,10 +1,13 @@
 fileFormatVersion: 2
-guid: 6acafd98dc4cae54cb381911d578e38c
+guid: f0f61962e44b2ff4fa62e6c72db070fe
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 1882757722001119989
-    second: 010_0
+      213: -421658398527452879
+    second: Water_Dark_A_0
+  - first:
+      213: 6754225852032752043
+    second: Water_Dark_A_1
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -37,7 +40,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 0
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -75,7 +78,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
+    textureCompression: 1
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +116,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: 010_0
+      name: Water_Dark_A_0
       rect:
         serializedVersion: 2
-        x: 5
-        y: 1
-        width: 120
-        height: 125
+        x: 99
+        y: 173
+        width: 77
+        height: 257
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +131,30 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 5fa10024c26e02a10800000000000000
-      internalID: 1882757722001119989
+      spriteID: 139063babe7f52af0800000000000000
+      internalID: -421658398527452879
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Water_Dark_A_1
+      rect:
+        serializedVersion: 2
+        x: 227
+        y: 111
+        width: 202
+        height: 202
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ba91c2380a4dbbd50800000000000000
+      internalID: 6754225852032752043
       vertices: []
       indices: 
       edges: []
@@ -148,7 +173,8 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      010_0: 1882757722001119989
+      Water_Dark_A_0: -421658398527452879
+      Water_Dark_A_1: 6754225852032752043
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -50,6 +50,8 @@ public class GameManager : MonoBehaviour
 
     public int Gold => gold;
     public event Action GoldChanged;
+    public EnhanceBonusState EnhanceBonuses { get; } = new();
+    public static GameManager Instance { get; private set; }
 
     public bool CanAfford(int amount) => amount <= 0 || gold >= amount;
 
@@ -66,6 +68,8 @@ public class GameManager : MonoBehaviour
 
     private void Awake()
     {
+        Instance = this;
+        EnhanceBonuses.Reset();
         spawner.enabled = false;
         playerShooter.enabled = false;
         equipSlot.gameObject.SetActive(false);
@@ -88,6 +92,9 @@ public class GameManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (Instance == this)
+            Instance = null;
+
         KillExpGaugeTween();
         UnsubscribeCombatEvents();
         UnwireEnhanceButtons();
@@ -555,6 +562,8 @@ public class GameManager : MonoBehaviour
         List<EnhanceOptionEffectData> effects = GameDataRepository.GetEnhanceEffects(option.Id);
         for (int i = 0; i < effects.Count; i++)
             ApplyEnhanceEffect(effects[i]);
+
+        RefreshEquippedCombatStats();
     }
 
     private void ApplyEnhanceEffect(EnhanceOptionEffectData effect)
@@ -569,7 +578,26 @@ public class GameManager : MonoBehaviour
             case "RepairBarrier":
                 ResolveBarrier()?.RestoreFullHp();
                 break;
+            default:
+                EnhanceBonuses.ApplyEffect(effect.EffectType, ParseEffectFloat(effect.Value));
+                break;
         }
+    }
+
+    private void RefreshEquippedCombatStats()
+    {
+        if (playerShooter == null || inventoryManager == null) return;
+        if (!playerShooter.enabled && !inCombat) return;
+
+        playerShooter.SetEquippedProjectiles(inventoryManager.GetBagItems());
+    }
+
+    private static float ParseEffectFloat(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return 0f;
+        return float.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed)
+            ? parsed
+            : 0f;
     }
 
     private Barrier ResolveBarrier()

@@ -4,9 +4,14 @@ using UnityEngine;
 
 public class Projectile : MonoBehaviour
 {
-    private const int AdditionalUnlockGrade = 5;
+    private const int AdditionalUnlockGrade = 4;
+    private const int AdditionalEnhancedGrade = 5;
     private const int IceAdditionalDirectionCount = 8;
+    private const int IceAdditionalEnhancedDirectionCount = 16;
     private const int FireAdditionalWaveCount = 5;
+    private const int FireAdditionalEnhancedWaveCount = 7;
+    private const int FireAdditionalLineCount = 3;
+    private const int FireAdditionalEnhancedLineCount = 5;
     private const float FireAdditionalWaveInterval = 0.06f;
     private const float FireAdditionalBaseScale = 0.75f;
     private const float FireAdditionalScaleStep = 0.35f;
@@ -15,12 +20,15 @@ public class Projectile : MonoBehaviour
     private const float FireAdditionalSideAngleDegrees = 25f;
     private const float WindPullSpeed = 1f;
     private const float WindPullRadius = 3f;
-    private const float WaterKnockbackDistance = 1.25f;
+    private const float WaterKnockbackDistance = 0.625f;
     private const float WaterKnockbackDuration = 0.15f;
-    private const float RockRootDuration = 1.5f;
+    private const float RockRootDuration = 0.75f;
     private const int GrimoireMultiHitCount = 15;
-    private const float GrimoireMultiHitStep = 0.05f;
-    private const float GrimoireHitSpeedReduce = 3f;
+    private const float GrimoireMultiHitStep = 0.5f;
+    private const float GrimoireHitSpeedReduce = 5.0f;
+    private const float GrimoireMonsterSlowMultiplier = 0.5f;
+    private const float GrimoireMonsterSlowDuration = 0.5f;
+    private const float CriticalDamageMultiplier = 2f;
 
     [SerializeField] private float range = 5f;
     [SerializeField] private float fireInterval = 1f;
@@ -49,6 +57,10 @@ public class Projectile : MonoBehaviour
     private Projectile additionalProjectilePrefab;
     private bool spawnAdditionalOnHit;
     private Item.ItemCategory sourceCategory;
+    private int sourceItemGrade;
+    private float activeWaterKnockbackDistance = WaterKnockbackDistance;
+    private float activeRockRootDuration = RockRootDuration;
+    private float activeWindPullSpeed = WindPullSpeed;
     private bool freeFlight;
     private bool instantLinger;
     private bool windPull;
@@ -56,8 +68,13 @@ public class Projectile : MonoBehaviour
     private bool grimoireMultiHit;
     private int multiHitRemaining;
     private bool multiHitInProgress;
-    private Coroutine grimoireMultiHitRoutine;
     private Monster grimoireFocusMonster;
+    private float baseMoveSpeed;
+    private float currentMoveSpeed;
+    private float fullFlightSpeed;
+    private float grimoireDistanceSinceHit;
+    private float criticalChance;
+    private bool lastHitWasCritical;
     private bool singleTargetHit;
     private readonly HashSet<Monster> piercedMonsters = new();
     private readonly List<Collider2D> overlapBuffer = new();
@@ -74,6 +91,9 @@ public class Projectile : MonoBehaviour
         range = newRange;
         damage = newDamage;
         fireInterval = newFireInterval;
+        baseMoveSpeed = moveSpeed;
+        fullFlightSpeed = moveSpeed;
+        currentMoveSpeed = moveSpeed;
     }
 
     public void ApplyDamage(int newDamage)
@@ -81,10 +101,29 @@ public class Projectile : MonoBehaviour
         damage = newDamage;
     }
 
-    public void EnableWindPull()
+    public void ApplyCriticalChance(float chance)
+    {
+        criticalChance = Mathf.Clamp01(chance);
+    }
+
+    private int RollHitDamage()
+    {
+        lastHitWasCritical = false;
+        int amount = Mathf.Max(0, damage);
+        if (amount <= 0 || criticalChance <= 0f) return amount;
+        if (Random.value >= criticalChance) return amount;
+
+        lastHitWasCritical = true;
+        return Mathf.Max(1, Mathf.RoundToInt(amount * CriticalDamageMultiplier));
+    }
+
+    public void EnableWindPull(float pullSpeed = -1f)
     {
         windPull = true;
+        activeWindPullSpeed = pullSpeed > 0f ? pullSpeed : WindPullSpeed;
     }
+
+    private bool HasEnhancedAdditional => sourceItemGrade >= AdditionalEnhancedGrade;
 
     public void ConfigureAdditionalOnHit(
         Projectile additionalPrefab,
@@ -92,6 +131,7 @@ public class Projectile : MonoBehaviour
         Item.ItemCategory category)
     {
         sourceCategory = category;
+        sourceItemGrade = itemGrade;
         grimoireMultiHit = false;
         multiHitRemaining = 0;
 
@@ -100,7 +140,9 @@ public class Projectile : MonoBehaviour
             additionalProjectilePrefab = null;
             spawnAdditionalOnHit = false;
             grimoireMultiHit = true;
-            multiHitRemaining = GrimoireMultiHitCount;
+            multiHitRemaining = HasEnhancedAdditional
+                ? GrimoireMultiHitCount * 2
+                : GrimoireMultiHitCount;
             return;
         }
 
@@ -117,7 +159,7 @@ public class Projectile : MonoBehaviour
 
     public bool Init(Monster targetMonster)
     {
-        reservedAmount = Mathf.Max(0, damage);
+        reservedAmount = RollHitDamage();
         if (targetMonster == null || reservedAmount <= 0) return false;
         if (!targetMonster.TryReserve(this, reservedAmount)) return false;
 
@@ -127,6 +169,8 @@ public class Projectile : MonoBehaviour
         singleTargetHit = false;
         spawnPosition = transform.position;
         piercedMonsters.Clear();
+        EnsureFlightSpeeds();
+        currentMoveSpeed = fullFlightSpeed;
         FaceToward(target.transform.position);
         initialized = true;
         SpawnEffect();
@@ -134,7 +178,7 @@ public class Projectile : MonoBehaviour
         if (isInstant)
         {
             reservationConsumed = true;
-            target.TryApplyReservedHit(this);
+            target.TryApplyReservedHit(this, lastHitWasCritical);
             Finish();
         }
 
@@ -154,6 +198,8 @@ public class Projectile : MonoBehaviour
         reservationConsumed = true;
         spawnPosition = transform.position;
         piercedMonsters.Clear();
+        EnsureFlightSpeeds();
+        currentMoveSpeed = fullFlightSpeed;
         initialized = true;
         SpawnEffect();
         return true;
@@ -175,10 +221,11 @@ public class Projectile : MonoBehaviour
         return true;
     }
 
-    public bool InitWaterAdditional(Monster hitMonster)
+    public bool InitWaterAdditional(Monster hitMonster, float knockbackDistance = -1f)
     {
         if (hitMonster == null || hitMonster.IsDead) return false;
 
+        activeWaterKnockbackDistance = knockbackDistance > 0f ? knockbackDistance : WaterKnockbackDistance;
         target = hitMonster;
         freeFlight = false;
         instantLinger = true;
@@ -189,20 +236,21 @@ public class Projectile : MonoBehaviour
         piercedMonsters.Add(hitMonster);
         initialized = true;
 
-        int amount = Mathf.Max(0, damage);
+        int amount = RollHitDamage();
         if (amount > 0 && hitMonster.CanBeTargeted && hitMonster.TryReserve(this, amount))
-            hitMonster.TryApplyReservedHit(this);
+            hitMonster.TryApplyReservedHit(this, lastHitWasCritical);
 
         if (!hitMonster.IsDead)
-            hitMonster.ApplyKnockback(Vector3.up, WaterKnockbackDistance, WaterKnockbackDuration);
+            hitMonster.ApplyKnockback(Vector3.up, activeWaterKnockbackDistance, WaterKnockbackDuration);
 
         SpawnInstantLingerEffect();
         StartCoroutine(FinishAfterEffectAnimation());
         return true;
     }
 
-    public bool InitRockAdditional()
+    public bool InitRockAdditional(float rootDuration = -1f)
     {
+        activeRockRootDuration = rootDuration > 0f ? rootDuration : RockRootDuration;
         target = null;
         freeFlight = false;
         instantLinger = true;
@@ -248,12 +296,12 @@ public class Projectile : MonoBehaviour
         if (monster == null || monster.IsDead || !monster.CanBeTargeted) return;
         if (!piercedMonsters.Add(monster)) return;
 
-        int amount = Mathf.Max(0, damage);
+        int amount = RollHitDamage();
         if (amount > 0 && monster.TryReserve(this, amount))
-            monster.TryApplyReservedHit(this);
+            monster.TryApplyReservedHit(this, lastHitWasCritical);
 
         if (!monster.IsDead)
-            monster.ApplyTemporaryStop(RockRootDuration);
+            monster.ApplyTemporaryStop(activeRockRootDuration);
     }
 
     public void OnTargetLost()
@@ -331,12 +379,18 @@ public class Projectile : MonoBehaviour
     {
         if (!initialized || finished) return;
 
-        if (instantLinger || multiHitInProgress)
+        if (instantLinger)
             return;
+
+        if (grimoireMultiHit)
+        {
+            UpdateGrimoireFlight();
+            return;
+        }
 
         if (freeFlight)
         {
-            transform.position += direction * moveSpeed * Time.deltaTime;
+            transform.position += direction * currentMoveSpeed * Time.deltaTime;
             if (IsOffScreen())
                 Finish();
             return;
@@ -349,7 +403,7 @@ public class Projectile : MonoBehaviour
         }
 
         FaceToward(target.transform.position);
-        transform.position += direction * moveSpeed * Time.deltaTime;
+        transform.position += direction * currentMoveSpeed * Time.deltaTime;
 
         if (Vector3.Distance(spawnPosition, transform.position) > range)
             Finish();
@@ -375,7 +429,7 @@ public class Projectile : MonoBehaviour
             float distanceSqr = (monster.transform.position - pullOrigin).sqrMagnitude;
             if (distanceSqr > radiusSqr) continue;
 
-            monster.ApplyConstantWindPull(pullOrigin, WindPullSpeed);
+            monster.ApplyConstantWindPull(pullOrigin, activeWindPullSpeed);
         }
     }
 
@@ -424,7 +478,7 @@ public class Projectile : MonoBehaviour
         if (!reservationConsumed)
         {
             reservationConsumed = true;
-            monster.TryApplyReservedHit(this);
+            monster.TryApplyReservedHit(this, lastHitWasCritical);
         }
 
         Finish();
@@ -433,97 +487,184 @@ public class Projectile : MonoBehaviour
     private void ApplyGrimoireMultiHit(Monster monster)
     {
         if (!grimoireMultiHit || monster == null || monster.IsDead || multiHitRemaining <= 0) return;
-        if (multiHitInProgress || grimoireMultiHitRoutine != null) return;
+        if (multiHitInProgress) return;
 
-        grimoireFocusMonster = monster;
-        grimoireMultiHitRoutine = StartCoroutine(GrimoireMultiHitRoutine());
+        BeginGrimoireMultiHit(monster);
     }
 
-    private IEnumerator GrimoireMultiHitRoutine()
+    private void BeginGrimoireMultiHit(Monster monster)
     {
-        multiHitInProgress = true;
-        freeFlight = false;
-
         if (direction.sqrMagnitude <= 0.0001f)
             direction = Vector3.up;
         else
             direction.Normalize();
 
-        float slowSpeed = Mathf.Max(0.1f, moveSpeed - GrimoireHitSpeedReduce);
+        grimoireFocusMonster = monster;
+        freeFlight = false;
+        multiHitInProgress = true;
+        grimoireDistanceSinceHit = 0f;
 
-        // Impact at X: slow to S-k and deal first hit.
+        // Off-track: slow to S-k and deal first hit at contact.
+        EnsureFlightSpeeds();
+        currentMoveSpeed = GetGrimoireSlowSpeed();
+
         ApplyGrimoireFocusHit();
         multiHitRemaining--;
 
         if (multiHitRemaining <= 0)
         {
             EndGrimoireMultiHit(destroyProjectile: true);
-            yield break;
+            return;
         }
 
-        if (IsGrimoireFocusDead())
-        {
+        if (IsGrimoireFocusDead() || !IsOverlappingFocus())
             ResumeGrimoireFullSpeed();
-            yield break;
+    }
+
+    private void UpdateGrimoireFlight()
+    {
+        EnsureFlightSpeeds();
+
+        // Off-track while engaged with a living overlapping monster.
+        if (multiHitInProgress)
+        {
+            if (IsGrimoireFocusDead() || !IsOverlappingFocus())
+            {
+                // Back on-track: restore full speed immediately.
+                ResumeGrimoireFullSpeed();
+            }
+            else
+            {
+                UpdateGrimoireMultiHitMovement();
+                return;
+            }
         }
 
-        float distanceSinceHit = 0f;
+        // On-track: always fly at launch speed S.
+        currentMoveSpeed = GetFullFlightSpeed();
 
-        while (multiHitRemaining > 0)
+        if (freeFlight || target == null)
         {
-            if (finished) yield break;
+            if (direction.sqrMagnitude <= 0.0001f)
+                direction = Vector3.up;
 
-            if (IsGrimoireFocusDead())
-            {
-                ResumeGrimoireFullSpeed();
-                yield break;
-            }
-
-            float travel = slowSpeed * Time.deltaTime;
-            transform.position += direction * travel;
-            distanceSinceHit += travel;
+            transform.position += direction * currentMoveSpeed * Time.deltaTime;
             Physics2D.SyncTransforms();
 
             if (IsOffScreen())
             {
-                EndGrimoireMultiHit(destroyProjectile: true);
-                yield break;
+                Finish();
+                return;
             }
 
-            if (distanceSinceHit < GrimoireMultiHitStep)
-            {
-                yield return null;
-                continue;
-            }
+            // Re-enter off-track if we are still/again touching a monster.
+            TryBeginGrimoireMultiHitFromOverlap();
+            return;
+        }
 
-            distanceSinceHit -= GrimoireMultiHitStep;
+        FaceToward(target.transform.position);
+        transform.position += direction * currentMoveSpeed * Time.deltaTime;
+
+        if (Vector3.Distance(spawnPosition, transform.position) > range)
+            Finish();
+    }
+
+    private void UpdateGrimoireMultiHitMovement()
+    {
+        currentMoveSpeed = GetGrimoireSlowSpeed();
+
+        float travel = currentMoveSpeed * Time.deltaTime;
+        transform.position += direction * travel;
+        grimoireDistanceSinceHit += travel;
+        Physics2D.SyncTransforms();
+
+        if (IsOffScreen())
+        {
+            EndGrimoireMultiHit(destroyProjectile: true);
+            return;
+        }
+
+        while (multiHitRemaining > 0 && grimoireDistanceSinceHit >= GrimoireMultiHitStep)
+        {
+            if (!IsOverlappingFocus() || IsGrimoireFocusDead())
+                break;
+
+            grimoireDistanceSinceHit -= GrimoireMultiHitStep;
             ApplyGrimoireFocusHit();
             multiHitRemaining--;
 
             if (multiHitRemaining <= 0)
             {
                 EndGrimoireMultiHit(destroyProjectile: true);
-                yield break;
+                return;
             }
-
-            if (IsGrimoireFocusDead())
-            {
-                ResumeGrimoireFullSpeed();
-                yield break;
-            }
-
-            yield return null;
         }
 
-        EndGrimoireMultiHit(destroyProjectile: true);
+        if (multiHitRemaining <= 0)
+            return;
+
+        if (IsGrimoireFocusDead() || !IsOverlappingFocus())
+            ResumeGrimoireFullSpeed();
+    }
+
+    private void TryBeginGrimoireMultiHitFromOverlap()
+    {
+        if (multiHitInProgress || multiHitRemaining <= 0) return;
+
+        Collider2D selfCollider = GetComponent<Collider2D>();
+        if (selfCollider == null) return;
+
+        overlapBuffer.Clear();
+        ContactFilter2D filter = new ContactFilter2D { useTriggers = true };
+        filter.NoFilter();
+        Physics2D.OverlapCollider(selfCollider, filter, overlapBuffer);
+
+        for (int i = 0; i < overlapBuffer.Count; i++)
+        {
+            Collider2D other = overlapBuffer[i];
+            if (other == null) continue;
+
+            Monster monster = other.GetComponent<Monster>();
+            if (monster == null || monster.IsDead) continue;
+
+            BeginGrimoireMultiHit(monster);
+            return;
+        }
+    }
+
+    private bool IsOverlappingFocus()
+    {
+        if (grimoireFocusMonster == null || grimoireFocusMonster.IsDead) return false;
+
+        Collider2D selfCollider = GetComponent<Collider2D>();
+        if (selfCollider == null) return false;
+
+        Collider2D[] focusColliders = grimoireFocusMonster.GetComponentsInChildren<Collider2D>();
+        for (int i = 0; i < focusColliders.Length; i++)
+        {
+            Collider2D other = focusColliders[i];
+            if (other != null && other.enabled && selfCollider.IsTouching(other))
+                return true;
+        }
+
+        return false;
+    }
+
+    private float GetGrimoireSlowSpeed()
+    {
+        return Mathf.Max(0.1f, GetFullFlightSpeed() - GrimoireHitSpeedReduce);
     }
 
     private void ApplyGrimoireFocusHit()
     {
         Monster monster = grimoireFocusMonster;
-        if (monster == null || monster.IsDead || !monster.CanBeTargeted) return;
+        // Do not gate on CanBeTargeted: Init may already reserve enough damage that
+        // ExpectedRemainingHp becomes 0, which would skip applying the reserved hit.
+        if (monster == null || monster.IsDead) return;
 
-        int amount = Mathf.Max(0, damage);
+        monster.ApplyTemporarySlow(GrimoireMonsterSlowMultiplier, GrimoireMonsterSlowDuration);
+
+        int amount = RollHitDamage();
         if (amount <= 0) return;
 
         TryApplyOneGrimoireHit(monster, amount);
@@ -534,13 +675,15 @@ public class Projectile : MonoBehaviour
         if (!reservationConsumed && target == monster)
         {
             reservationConsumed = true;
-            return monster.TryApplyReservedHit(this);
+            return monster.TryApplyReservedHit(this, lastHitWasCritical);
         }
 
-        if (!monster.TryReserve(this, amount))
-            return false;
-
-        return monster.TryApplyReservedHit(this);
+        // Multi-hit ticks after the first: apply directly so overkill reservation
+        // / ExpectedRemainingHp == 0 cannot block subsequent multi-hit ticks.
+        if (monster.IsDead || monster.Hp <= 0) return false;
+        monster.ReleaseReservation(this);
+        monster.ApplyDamage(amount, lastHitWasCritical);
+        return true;
     }
 
     private bool IsGrimoireFocusDead()
@@ -551,11 +694,12 @@ public class Projectile : MonoBehaviour
     private void ResumeGrimoireFullSpeed()
     {
         multiHitInProgress = false;
-        grimoireMultiHitRoutine = null;
         grimoireFocusMonster = null;
         target = null;
         freeFlight = true;
         reservationConsumed = true;
+        currentMoveSpeed = GetFullFlightSpeed();
+        grimoireDistanceSinceHit = 0f;
 
         if (direction.sqrMagnitude <= 0.0001f)
             direction = Vector3.up;
@@ -564,11 +708,25 @@ public class Projectile : MonoBehaviour
     private void EndGrimoireMultiHit(bool destroyProjectile)
     {
         multiHitInProgress = false;
-        grimoireMultiHitRoutine = null;
         grimoireFocusMonster = null;
+        currentMoveSpeed = GetFullFlightSpeed();
 
         if (destroyProjectile && !finished)
             Finish();
+    }
+
+    private void EnsureFlightSpeeds()
+    {
+        if (baseMoveSpeed <= 0f)
+            baseMoveSpeed = moveSpeed;
+        if (fullFlightSpeed <= 0f)
+            fullFlightSpeed = baseMoveSpeed > 0f ? baseMoveSpeed : moveSpeed;
+    }
+
+    private float GetFullFlightSpeed()
+    {
+        EnsureFlightSpeeds();
+        return fullFlightSpeed;
     }
 
     private void TryPierceHit(Monster monster)
@@ -576,11 +734,11 @@ public class Projectile : MonoBehaviour
         if (monster == null || !monster.CanBeTargeted) return;
         if (!piercedMonsters.Add(monster)) return;
 
-        int amount = Mathf.Max(0, damage);
+        int amount = RollHitDamage();
         if (amount <= 0) return;
         if (!monster.TryReserve(this, amount)) return;
 
-        monster.TryApplyReservedHit(this);
+        monster.TryApplyReservedHit(this, lastHitWasCritical);
     }
 
     private void TrySpawnAdditionalProjectile(Monster hitMonster, Vector3 hitPosition)
@@ -626,7 +784,7 @@ public class Projectile : MonoBehaviour
         }
 
         Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
-        additional.ApplyDamage(damage);
+        ConfigureSpawnedAdditional(additional);
 
         Monster nextTarget = FindNearestMonster(hitPosition, additional.Range, hitMonster);
         if (nextTarget == null || !additional.Init(nextTarget))
@@ -636,7 +794,7 @@ public class Projectile : MonoBehaviour
     private void SpawnInstantAdditionalProjectile(Vector3 hitPosition)
     {
         Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
-        additional.ApplyDamage(damage);
+        ConfigureSpawnedAdditional(additional);
         if (!additional.InitInstantInPlace())
             Destroy(additional.gameObject);
     }
@@ -644,8 +802,9 @@ public class Projectile : MonoBehaviour
     private void SpawnWindAdditionalProjectile(Vector3 hitPosition)
     {
         Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
-        additional.ApplyDamage(damage);
-        additional.EnableWindPull();
+        ConfigureSpawnedAdditional(additional);
+        float pullSpeed = HasEnhancedAdditional ? WindPullSpeed * 2f : WindPullSpeed;
+        additional.EnableWindPull(pullSpeed);
         if (!additional.InitInstantInPlace())
             Destroy(additional.gameObject);
     }
@@ -653,16 +812,18 @@ public class Projectile : MonoBehaviour
     private void SpawnWaterAdditionalProjectile(Vector3 hitPosition, Monster hitMonster)
     {
         Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
-        additional.ApplyDamage(damage);
-        if (!additional.InitWaterAdditional(hitMonster))
+        ConfigureSpawnedAdditional(additional);
+        float knockback = HasEnhancedAdditional ? WaterKnockbackDistance * 2f : WaterKnockbackDistance;
+        if (!additional.InitWaterAdditional(hitMonster, knockback))
             Destroy(additional.gameObject);
     }
 
     private void SpawnRockAdditionalProjectile(Vector3 hitPosition)
     {
         Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
-        additional.ApplyDamage(damage);
-        if (!additional.InitRockAdditional())
+        ConfigureSpawnedAdditional(additional);
+        float rootDuration = HasEnhancedAdditional ? RockRootDuration * 2f : RockRootDuration;
+        if (!additional.InitRockAdditional(rootDuration))
             Destroy(additional.gameObject);
     }
 
@@ -672,14 +833,19 @@ public class Projectile : MonoBehaviour
             ? facingDirection.normalized
             : Vector3.up;
 
+        int waveCount = HasEnhancedAdditional ? FireAdditionalEnhancedWaveCount : FireAdditionalWaveCount;
+        int lineCount = HasEnhancedAdditional ? FireAdditionalEnhancedLineCount : FireAdditionalLineCount;
+
         GameObject host = new GameObject("FireAdditionalSequence");
         FireAdditionalSequence sequence = host.AddComponent<FireAdditionalSequence>();
         sequence.Play(
             additionalProjectilePrefab,
             damage,
+            criticalChance,
             hitPosition,
             facing,
-            FireAdditionalWaveCount,
+            waveCount,
+            lineCount,
             FireAdditionalWaveInterval,
             FireAdditionalBaseScale,
             FireAdditionalScaleStep,
@@ -690,19 +856,28 @@ public class Projectile : MonoBehaviour
 
     private void SpawnIceAdditionalProjectiles(Vector3 hitPosition)
     {
-        float stepDegrees = 360f / IceAdditionalDirectionCount;
+        int directionCount = HasEnhancedAdditional
+            ? IceAdditionalEnhancedDirectionCount
+            : IceAdditionalDirectionCount;
+        float stepDegrees = 360f / directionCount;
         float startAngleDegrees = Random.Range(0f, stepDegrees);
 
-        for (int i = 0; i < IceAdditionalDirectionCount; i++)
+        for (int i = 0; i < directionCount; i++)
         {
             float angleRad = (startAngleDegrees + stepDegrees * i) * Mathf.Deg2Rad;
             Vector3 moveDirection = new Vector3(Mathf.Cos(angleRad), Mathf.Sin(angleRad), 0f);
 
             Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
-            additional.ApplyDamage(damage);
+            ConfigureSpawnedAdditional(additional);
             if (!additional.InitFreeFlight(moveDirection))
                 Destroy(additional.gameObject);
         }
+    }
+
+    private void ConfigureSpawnedAdditional(Projectile additional)
+    {
+        additional.ApplyDamage(damage);
+        additional.ApplyCriticalChance(criticalChance);
     }
 
     private static Monster FindNearestMonster(Vector3 origin, float searchRange, Monster exclude)
@@ -807,9 +982,11 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
     public void Play(
         Projectile prefab,
         int damage,
+        float criticalChance,
         Vector3 position,
         Vector3 facing,
         int waveCount,
+        int lineCount,
         float waveInterval,
         float baseScale,
         float scaleStep,
@@ -820,9 +997,11 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
         StartCoroutine(Run(
             prefab,
             damage,
+            criticalChance,
             position,
             facing,
             waveCount,
+            lineCount,
             waveInterval,
             baseScale,
             scaleStep,
@@ -834,9 +1013,11 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
     private IEnumerator Run(
         Projectile prefab,
         int damage,
+        float criticalChance,
         Vector3 position,
         Vector3 facing,
         int waveCount,
+        int lineCount,
         float waveInterval,
         float baseScale,
         float scaleStep,
@@ -851,7 +1032,7 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
         }
 
         Vector3 prefabScale = prefab.transform.localScale;
-        float[] directionAngles = { 0f, sideAngleDegrees, -sideAngleDegrees };
+        float[] directionAngles = BuildFireDirectionAngles(lineCount, sideAngleDegrees);
 
         for (int wave = 0; wave < waveCount; wave++)
         {
@@ -867,6 +1048,7 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
 
                 Projectile additional = Instantiate(prefab, spawnPosition, rotation);
                 additional.ApplyDamage(damage);
+                additional.ApplyCriticalChance(criticalChance);
                 additional.transform.localScale = prefabScale * scaleMultiplier;
 
                 if (!additional.InitInstantInPlace())
@@ -878,5 +1060,28 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
         }
 
         Destroy(gameObject);
+    }
+
+    private static float[] BuildFireDirectionAngles(int lineCount, float sideAngleDegrees)
+    {
+        int count = Mathf.Max(1, lineCount);
+        float[] angles = new float[count];
+        if (count == 1)
+        {
+            angles[0] = 0f;
+            return angles;
+        }
+
+        int half = count / 2;
+        int index = 0;
+        for (int i = -half; i <= half; i++)
+        {
+            // Skip duplicate center when even count.
+            if (count % 2 == 0 && i == 0) continue;
+            if (index >= count) break;
+            angles[index++] = i * sideAngleDegrees;
+        }
+
+        return angles;
     }
 }

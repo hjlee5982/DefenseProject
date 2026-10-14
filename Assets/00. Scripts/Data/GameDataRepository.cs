@@ -407,8 +407,8 @@ public static class GameDataRepository
         string rangeText = Get(row, "Range");
         string damageText = Get(row, "Damage");
         string fireIntervalText = Get(row, "FireInterval");
+        // Weapons have Damage/FireInterval. Buff rows may only fill Range as option %.
         bool hasCombatStats =
-            !string.IsNullOrWhiteSpace(rangeText) ||
             !string.IsNullOrWhiteSpace(damageText) ||
             !string.IsNullOrWhiteSpace(fireIntervalText);
 
@@ -418,8 +418,15 @@ public static class GameDataRepository
             Name = Get(row, "Name")?.Trim() ?? string.Empty,
             PrefabKey = string.IsNullOrWhiteSpace(prefabKey) ? id?.Trim() ?? string.Empty : prefabKey.Trim(),
             Range = ParseFloat(rangeText),
-            Damage = ParseInt(damageText),
+            Damage = ParseFloat(damageText),
             FireInterval = ParseFloat(fireIntervalText),
+            AddRange = ParseFloat(Get(row, "AddRange")),
+            AddDamage = ParseFloat(Get(row, "AddDamage")),
+            AddFireInterval = ParseFloat(Get(row, "AddFireInterval")),
+            ExtraFireInterval = ParseFloat(Get(row, "ExtraFireInterval")),
+            ExtraDamage = ParseFloat(Get(row, "ExtraDamage")),
+            Critical = ParseFloat(Get(row, "Critical")),
+            ExtraAddRange = ParseFloat(Get(row, "ExtraRange", "ExtraAddRange")),
             HasCombatStats = hasCombatStats
         };
 

@@ -60,12 +60,31 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     private float dragStartAngleZ;
     private float dragStartTargetAngleZ;
 
+    public enum BuffOptionType
+    {
+        None,
+        ExtraFireInterval,
+        ExtraDamage,
+        Critical,
+        ExtraAddRange
+    }
+
+    private const string BuffPotionKey = "Item_Buff_Potion";
+    private const string BuffScrollKey = "Item_Buff_Scroll";
+    private const string BuffQuillPenKey = "Item_Buff_QuillPen";
+    private const string BuffCrystalBallKey = "Item_Buff_CrystalBall";
+
     private string dataId;
     private string displayName;
-    private float range;
-    private int damage;
-    private float fireInterval;
+    private float baseRange;
+    private float baseDamage;
+    private float baseFireInterval;
+    private float addRange = 1f;
+    private float addDamage = 1f;
+    private float addFireInterval = 1f;
     private bool hasCombatStats;
+    private BuffOptionType buffOptionType;
+    private float buffOptionPercent;
 
     public Projectile ProjectilePrefab => projectilePrefab;
     public Projectile AdditionalProjectilePrefab => additionalProjectilePrefab;
@@ -77,13 +96,17 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     public string ShopBanKey => GetTypeKey();
     public string DataId => dataId;
     public string DisplayName => string.IsNullOrEmpty(displayName) ? GetTypeKey() : displayName;
-    public float Range => hasCombatStats ? range : GetFallbackRange();
-    public int Damage => hasCombatStats ? damage : GetFallbackDamage();
-    public float FireInterval => hasCombatStats ? fireInterval : GetFallbackFireInterval();
+    public float Range => hasCombatStats ? GetScaledRange() : GetFallbackRange();
+    public int Damage => hasCombatStats ? GetScaledDamage() : GetFallbackDamage();
+    public float FireInterval => hasCombatStats ? GetScaledFireInterval() : GetFallbackFireInterval();
     public ItemCategory Category => category;
     public bool IsBuff => category == ItemCategory.Buff;
     public bool IsWeapon => !IsBuff;
     public bool IsProjectileWeapon => IsWeapon && projectilePrefab != null;
+    public BuffOptionType BuffOption => buffOptionType;
+    public float BuffOptionPercent => buffOptionPercent;
+    public float BuffContributionPercent =>
+        buffOptionType == BuffOptionType.None ? 0f : grade * buffOptionPercent;
 
     private void Awake()
     {
@@ -306,13 +329,74 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 
         dataId = itemData.Id;
         displayName = itemData.Name;
+        ApplyBuffOptionData(itemData);
 
         if (!itemData.HasCombatStats) return;
 
         hasCombatStats = true;
-        range = itemData.Range;
-        damage = itemData.Damage;
-        fireInterval = itemData.FireInterval;
+        baseRange = itemData.Range;
+        baseDamage = itemData.Damage;
+        baseFireInterval = itemData.FireInterval;
+        addRange = itemData.AddRange > 0f ? itemData.AddRange : 1f;
+        addDamage = itemData.AddDamage > 0f ? itemData.AddDamage : 1f;
+        addFireInterval = itemData.AddFireInterval > 0f ? itemData.AddFireInterval : 1f;
+    }
+
+    private void ApplyBuffOptionData(ItemData itemData)
+    {
+        buffOptionType = BuffOptionType.None;
+        buffOptionPercent = 0f;
+
+        string key = GetTypeKey();
+        if (key == BuffPotionKey)
+        {
+            buffOptionType = BuffOptionType.ExtraFireInterval;
+            buffOptionPercent = ResolveBuffPercent(itemData.ExtraFireInterval, itemData.Range);
+        }
+        else if (key == BuffScrollKey)
+        {
+            buffOptionType = BuffOptionType.ExtraDamage;
+            buffOptionPercent = ResolveBuffPercent(itemData.ExtraDamage, itemData.Range);
+        }
+        else if (key == BuffQuillPenKey)
+        {
+            buffOptionType = BuffOptionType.Critical;
+            buffOptionPercent = ResolveBuffPercent(itemData.Critical, itemData.Range);
+        }
+        else if (key == BuffCrystalBallKey)
+        {
+            buffOptionType = BuffOptionType.ExtraAddRange;
+            buffOptionPercent = ResolveBuffPercent(itemData.ExtraAddRange, itemData.Range);
+        }
+    }
+
+    private static float ResolveBuffPercent(float dedicatedValue, float rangeFallback)
+    {
+        if (dedicatedValue > 0f) return dedicatedValue;
+        return rangeFallback > 0f ? rangeFallback : 0f;
+    }
+
+    private float GetScaledRange()
+    {
+        return baseRange * GetGradeMultiplier(addRange);
+    }
+
+    private int GetScaledDamage()
+    {
+        return Mathf.Max(0, Mathf.RoundToInt(baseDamage * GetGradeMultiplier(addDamage)));
+    }
+
+    private float GetScaledFireInterval()
+    {
+        float divisor = GetGradeMultiplier(addFireInterval);
+        return divisor > 0f ? baseFireInterval / divisor : baseFireInterval;
+    }
+
+    private float GetGradeMultiplier(float perGradeFactor)
+    {
+        int steps = Mathf.Max(0, grade - 1);
+        if (steps <= 0 || perGradeFactor <= 0f) return 1f;
+        return Mathf.Pow(perGradeFactor, steps);
     }
 
     private float GetFallbackRange()

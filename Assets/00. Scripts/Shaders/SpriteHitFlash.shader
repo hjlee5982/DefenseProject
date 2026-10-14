@@ -4,6 +4,7 @@ Shader "Defense/SpriteHitFlash"
     {
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
+        _FlashColor ("Flash Color", Color) = (1,1,1,1)
         _FlashAmount ("Flash Amount", Range(0, 1)) = 0
     }
 
@@ -34,6 +35,7 @@ Shader "Defense/SpriteHitFlash"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color;
+                float4 _FlashColor;
                 float _FlashAmount;
             CBUFFER_END
 
@@ -64,7 +66,7 @@ Shader "Defense/SpriteHitFlash"
             half4 Frag(Varyings input) : SV_Target
             {
                 half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv) * input.color;
-                half3 rgb = lerp(tex.rgb, half3(1.0, 1.0, 1.0), saturate(_FlashAmount));
+                half3 rgb = lerp(tex.rgb, _FlashColor.rgb, saturate(_FlashAmount));
                 return half4(rgb, tex.a);
             }
             ENDHLSL

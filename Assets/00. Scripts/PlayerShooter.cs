@@ -11,6 +11,7 @@ public class PlayerShooter : MonoBehaviour
         public float fireInterval;
         public float range;
         public int damage;
+        public float criticalChance;
         public Projectile projectilePrefab;
         public Projectile additionalProjectilePrefab;
     }
@@ -37,6 +38,11 @@ public class PlayerShooter : MonoBehaviour
 
     public void SetEquippedProjectiles(IReadOnlyList<Item> items)
     {
+        CombatBuffUtility.Bonuses buffs = CombatBuffUtility.Collect(items);
+        EnhanceBonusState enhance = GameManager.Instance != null
+            ? GameManager.Instance.EnhanceBonuses
+            : null;
+
         List<EquippedWeapon> equippedWeapons = new();
         int equipSlotIndex = 0;
 
@@ -53,9 +59,10 @@ public class PlayerShooter : MonoBehaviour
                 equipSlotIndex = equipSlotIndex,
                 grade = item.Grade,
                 category = item.Category,
-                fireInterval = item.FireInterval,
-                range = item.Range,
-                damage = item.Damage,
+                fireInterval = CombatStatCalculator.GetFinalFireInterval(item, buffs, enhance),
+                range = CombatStatCalculator.GetFinalRange(item, buffs),
+                damage = CombatStatCalculator.GetFinalDamage(item, buffs, enhance),
+                criticalChance = CombatStatCalculator.GetCriticalChance(buffs),
                 projectilePrefab = projectile,
                 additionalProjectilePrefab = item.AdditionalProjectilePrefab
             });
@@ -134,6 +141,7 @@ public class PlayerShooter : MonoBehaviour
 
         Projectile projectile = Instantiate(weapon.projectilePrefab, FireOrigin, Quaternion.identity);
         projectile.ApplyCombatStats(weapon.range, weapon.damage, weapon.fireInterval);
+        projectile.ApplyCriticalChance(weapon.criticalChance);
         projectile.ConfigureAdditionalOnHit(weapon.additionalProjectilePrefab, weapon.grade, weapon.category);
 
         if (projectile.Init(target))

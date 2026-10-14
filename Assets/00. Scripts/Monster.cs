@@ -30,6 +30,9 @@ public class Monster : MonoBehaviour
     private static readonly int AttackHash = Animator.StringToHash("Attack");
     private static readonly int MoveHash = Animator.StringToHash("Move");
     private static readonly int FlashAmountId = Shader.PropertyToID("_FlashAmount");
+    private static readonly int FlashColorId = Shader.PropertyToID("_FlashColor");
+    private static readonly Color NormalHitFlashColor = Color.white;
+    private static readonly Color CriticalHitFlashColor = Color.red;
     private const string HitFlashShaderName = "Defense/SpriteHitFlash";
 
     private string dataId;
@@ -54,6 +57,9 @@ public class Monster : MonoBehaviour
     private bool isMovementStopped;
     private Coroutine temporaryStopRoutine;
     private float animatorSpeedBeforeStop = 1f;
+    private Coroutine temporarySlowRoutine;
+    private float moveSpeedMultiplier = 1f;
+    private float animatorSpeedBeforeSlow = 1f;
     private readonly Dictionary<MonoBehaviour, int> reservations = new();
 
     public string DataId => dataId;
@@ -108,6 +114,12 @@ public class Monster : MonoBehaviour
             temporaryStopRoutine = null;
         }
 
+        if (temporarySlowRoutine != null)
+        {
+            StopCoroutine(temporarySlowRoutine);
+            temporarySlowRoutine = null;
+        }
+
         if (hitFlashMaterial != null)
         {
             Destroy(hitFlashMaterial);
@@ -141,7 +153,7 @@ public class Monster : MonoBehaviour
             return;
         }
 
-        transform.Translate(Vector3.down * moveSpeed * Time.deltaTime);
+        transform.Translate(Vector3.down * moveSpeed * moveSpeedMultiplier * Time.deltaTime);
     }
 
     public void ApplyTemporaryStop(float duration)
@@ -152,6 +164,16 @@ public class Monster : MonoBehaviour
             StopCoroutine(temporaryStopRoutine);
 
         temporaryStopRoutine = StartCoroutine(TemporaryStopRoutine(duration));
+    }
+
+    public void ApplyTemporarySlow(float speedMultiplier, float duration)
+    {
+        if (isDead || duration <= 0f) return;
+
+        if (temporarySlowRoutine != null)
+            StopCoroutine(temporarySlowRoutine);
+
+        temporarySlowRoutine = StartCoroutine(TemporarySlowRoutine(speedMultiplier, duration));
     }
 
     private IEnumerator TemporaryStopRoutine(float duration)
@@ -173,6 +195,26 @@ public class Monster : MonoBehaviour
         temporaryStopRoutine = null;
     }
 
+    private IEnumerator TemporarySlowRoutine(float speedMultiplier, float duration)
+    {
+        moveSpeedMultiplier = Mathf.Clamp(speedMultiplier, 0f, 1f);
+
+        if (animator != null)
+        {
+            animatorSpeedBeforeSlow = animator.speed > 0f ? animator.speed : 1f;
+            if (!isMovementStopped)
+                animator.speed = animatorSpeedBeforeSlow * moveSpeedMultiplier;
+        }
+
+        yield return new WaitForSeconds(duration);
+
+        moveSpeedMultiplier = 1f;
+        if (animator != null && !isMovementStopped)
+            animator.speed = animatorSpeedBeforeSlow;
+
+        temporarySlowRoutine = null;
+    }
+
     public void ApplyConstantWindPull(Vector3 origin, float speed)
     {
         if (isDead || isKnockback || isMovementStopped || speed <= 0f) return;
@@ -184,10 +226,67 @@ public class Monster : MonoBehaviour
         if (distance > 0.0001f)
         {
             float step = speed * Time.deltaTime;
-            transform.position += toOrigin / distance * Mathf.Min(step, distance);
+            Vector3 nextPosition = transform.position + toOrigin / distance * Mathf.Min(step, distance);
+            nextPosition = ClampAgainstBarrier(nextPosition);
+            transform.position = nextPosition;
         }
 
         ValidateBarrierAttackRange();
+    }
+
+    private static Barrier cachedBarrier;
+    private static float cachedBarrierTopY;
+    private static int cachedBarrierFrame = -1;
+
+    private Vector3 ClampAgainstBarrier(Vector3 position)
+    {
+        if (!TryGetBarrierTopY(out float barrierTopY))
+            return position;
+
+        // Monsters move downward (-Y). Do not allow wind pull to drag them past the barrier line.
+        if (position.y < barrierTopY)
+            position.y = barrierTopY;
+
+        return position;
+    }
+
+    private bool TryGetBarrierTopY(out float barrierTopY)
+    {
+        if (attackTargetBarrier != null)
+        {
+            Collider2D attackBarrierCollider = attackTargetBarrier.GetComponent<Collider2D>();
+            if (attackBarrierCollider != null)
+            {
+                barrierTopY = attackBarrierCollider.bounds.max.y;
+                return true;
+            }
+        }
+
+        if (cachedBarrierFrame != Time.frameCount)
+        {
+            cachedBarrierFrame = Time.frameCount;
+            if (cachedBarrier == null)
+                cachedBarrier = FindAnyObjectByType<Barrier>();
+
+            if (cachedBarrier != null)
+            {
+                Collider2D barrierCollider = cachedBarrier.GetComponent<Collider2D>();
+                cachedBarrierTopY = barrierCollider != null ? barrierCollider.bounds.max.y : float.NegativeInfinity;
+            }
+            else
+            {
+                cachedBarrierTopY = float.NegativeInfinity;
+            }
+        }
+
+        if (cachedBarrier == null || float.IsNegativeInfinity(cachedBarrierTopY))
+        {
+            barrierTopY = 0f;
+            return false;
+        }
+
+        barrierTopY = cachedBarrierTopY;
+        return true;
     }
 
     public void ApplyKnockback(Vector3 direction, float distance, float duration = 0.15f)
@@ -235,16 +334,21 @@ public class Monster : MonoBehaviour
         return true;
     }
 
-    public bool TryApplyReservedHit(MonoBehaviour source)
+    public bool TryApplyReservedHit(MonoBehaviour source, bool isCritical = false)
     {
         if (!TryConsumeReservation(source, out int amount)) return false;
-        TakeDamage(amount);
+        TakeDamage(amount, isCritical);
         return true;
     }
 
     public void ReleaseReservation(MonoBehaviour source)
     {
         TryConsumeReservation(source, out _);
+    }
+
+    public void ApplyDamage(int amount, bool isCritical = false)
+    {
+        TakeDamage(amount, isCritical);
     }
 
     private bool TryConsumeReservation(MonoBehaviour source, out int amount)
@@ -257,7 +361,7 @@ public class Monster : MonoBehaviour
         return true;
     }
 
-    private void TakeDamage(int amount)
+    private void TakeDamage(int amount, bool isCritical = false)
     {
         if (isDead || amount <= 0 || hp <= 0) return;
 
@@ -266,12 +370,16 @@ public class Monster : MonoBehaviour
 
         bool lethal = hp <= 0;
         if (lethal)
+        {
             BeginDeath(killed: true);
+            FinalizeDeath();
+            return;
+        }
 
-        PlayHitFlash(lethal ? FinalizeDeath : null);
+        PlayHitFlash(isCritical);
     }
 
-    private void PlayHitFlash(Action onComplete = null)
+    private void PlayHitFlash(bool isCritical = false, Action onComplete = null)
     {
         if (bodyRenderer == null || hitFlashCount <= 0 || !EnsureHitFlashMaterial())
         {
@@ -281,6 +389,7 @@ public class Monster : MonoBehaviour
 
         KillHitFlashTween(restoreMaterial: false);
         bodyRenderer.sharedMaterial = hitFlashMaterial;
+        SetFlashColor(isCritical ? CriticalHitFlashColor : NormalHitFlashColor);
         SetFlashAmount(0f);
 
         Sequence sequence = DOTween.Sequence();
@@ -321,6 +430,7 @@ public class Monster : MonoBehaviour
         }
 
         hitFlashMaterial = new Material(shader);
+        hitFlashMaterial.SetColor(FlashColorId, NormalHitFlashColor);
         return true;
     }
 
@@ -330,11 +440,18 @@ public class Monster : MonoBehaviour
         hitFlashMaterial.SetFloat(FlashAmountId, amount);
     }
 
+    private void SetFlashColor(Color color)
+    {
+        if (hitFlashMaterial == null) return;
+        hitFlashMaterial.SetColor(FlashColorId, color);
+    }
+
     private void RestoreOriginalMaterial()
     {
         if (bodyRenderer == null) return;
         bodyRenderer.sharedMaterial = originalSharedMaterial;
         SetFlashAmount(0f);
+        SetFlashColor(NormalHitFlashColor);
     }
 
     private void KillHitFlashTween(bool restoreMaterial)
