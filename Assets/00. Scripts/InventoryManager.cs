@@ -72,6 +72,7 @@ public class InventoryManager : MonoBehaviour
     private readonly List<RaycastResult> raycastResults = new();
     private Item draggingItem;
     private int remainingOptimizeCount;
+    private int shopStageOrder;
     private GameManager gameManager;
 
     public float BagCellSize => Bag.CellSize;
@@ -807,15 +808,63 @@ public class InventoryManager : MonoBehaviour
 
         if (allowed.Count == 0) return null;
 
-        Item picked = allowed[Random.Range(0, allowed.Count)];
+        Item picked = PickWeightedShopItem(allowed);
         int targetGrade = RollGrade(picked.MaxGrade);
         picked.SetGrade(targetGrade);
         return picked;
     }
 
+    /// <summary>
+    /// 다음에 진행할 스테이지(0부터). 상점 등급 확률을 Stage 시트에서 조회하는 데 쓴다.
+    /// </summary>
+    public void SetShopStageOrder(int stageOrder)
+    {
+        shopStageOrder = Mathf.Max(0, stageOrder);
+    }
+
+    private Item PickWeightedShopItem(List<Item> candidates)
+    {
+        float total = 0f;
+        for (int i = 0; i < candidates.Count; i++)
+            total += GetShopWeight(candidates[i]);
+
+        if (total <= 0f)
+            return candidates[Random.Range(0, candidates.Count)];
+
+        float roll = Random.Range(0f, total);
+        float cumulative = 0f;
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            cumulative += GetShopWeight(candidates[i]);
+            if (roll < cumulative)
+                return candidates[i];
+        }
+
+        return candidates[candidates.Count - 1];
+    }
+
+    private static float GetShopWeight(Item item)
+    {
+        if (item != null && GameDataRepository.TryGetItemByPrefabKey(item.ShopBanKey, out ItemData data))
+            return data.ShopWeight;
+
+        return 1f;
+    }
+
+    private float[] ResolveGradeChances()
+    {
+        if (GameDataRepository.TryGetStageByOrder(shopStageOrder, out StageData stage) &&
+            stage.ShopGradeWeights != null)
+        {
+            return stage.ShopGradeWeights;
+        }
+
+        return new[] { grade1Chance, grade2Chance, grade3Chance, grade4Chance, grade5Chance };
+    }
+
     private int RollGrade(int maxGrade)
     {
-        float[] chances = { grade1Chance, grade2Chance, grade3Chance, grade4Chance, grade5Chance };
+        float[] chances = ResolveGradeChances();
 
         float total = 0f;
         for (int i = 0; i < chances.Length; i++) total += chances[i];

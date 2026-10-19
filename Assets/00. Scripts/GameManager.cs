@@ -4,6 +4,7 @@ using System.Globalization;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
@@ -26,6 +27,13 @@ public class GameManager : MonoBehaviour
     [SerializeField] private PlayerShooter playerShooter;
     [SerializeField] private RoundEventScheduler roundEventScheduler;
     [SerializeField] private Barrier barrier;
+    [Header("Result")]
+    [SerializeField] private GameObject resultPanel;
+    [SerializeField] private TextMeshProUGUI resultStageText;
+    [SerializeField] private TextMeshProUGUI resultLevelText;
+    [SerializeField] private TextMeshProUGUI resultGoldText;
+    [SerializeField] private Button resultReturnButton;
+    [SerializeField] private string titleSceneName = "TitleScene";
 
     private const int ExpPerKill = 10;
     private const int DefaultExpToNextLevel = 100;
@@ -47,6 +55,8 @@ public class GameManager : MonoBehaviour
     private readonly EnhanceOptionData[] currentEnhanceOptions = new EnhanceOptionData[3];
     private Tween expGaugeTween;
     private int displayedRound = 1;
+    private bool isGameOver;
+    private Barrier subscribedBarrier;
 
     public int Gold => gold;
     public event Action GoldChanged;
@@ -79,6 +89,8 @@ public class GameManager : MonoBehaviour
         RefreshCombatHudTexts();
         SetCombatHudActive(false);
         SetEnhanceActive(false);
+        SetupResultPanel();
+        SubscribeBarrier();
 
         nextButtonComponent = nextButton.GetComponent<Button>();
         nextButtonComponent.onClick.AddListener(OnNextClicked);
@@ -98,6 +110,9 @@ public class GameManager : MonoBehaviour
         KillExpGaugeTween();
         UnsubscribeCombatEvents();
         UnwireEnhanceButtons();
+        UnsubscribeBarrier();
+        if (resultReturnButton != null)
+            resultReturnButton.onClick.RemoveListener(OnResultReturnClicked);
         Time.timeScale = 1f;
         if (inventoryManager != null)
         {
@@ -183,6 +198,7 @@ public class GameManager : MonoBehaviour
 
         clearedStageCount++;
         displayedRound = clearedStageCount + 1;
+        inventoryManager.SetShopStageOrder(clearedStageCount);
         PreparePhaseMode prepareMode = ResolvePreparePhaseMode(clearedStageCount);
         isInitialExpansionPhase = false;
         int expansionUnlockCount = GetExpansionUnlockCount();
@@ -199,6 +215,7 @@ public class GameManager : MonoBehaviour
 
     private void EnterInitialPreparePhase()
     {
+        inventoryManager.SetShopStageOrder(clearedStageCount);
         PreparePhaseMode prepareMode = inventoryManager.CanExpandBag
             ? PreparePhaseMode.BagExpansion
             : PreparePhaseMode.Normal;
@@ -523,7 +540,9 @@ public class GameManager : MonoBehaviour
 
     private int GetExpToNextLevel(int currentLevel)
     {
-        // TODO: LevelCurve 데이터에서 currentLevel 기준 필요 경험치를 조회
+        if (GameDataRepository.TryGetExpToNext(currentLevel, out int expToNext))
+            return expToNext;
+
         return DefaultExpToNextLevel;
     }
 
@@ -603,8 +622,88 @@ public class GameManager : MonoBehaviour
     private Barrier ResolveBarrier()
     {
         if (barrier != null) return barrier;
-        barrier = FindAnyObjectByType<Barrier>();
+        barrier = FindAnyObjectByType<Barrier>(FindObjectsInactive.Include);
         return barrier;
+    }
+
+    private void SubscribeBarrier()
+    {
+        Barrier target = ResolveBarrier();
+        if (target == null || subscribedBarrier == target) return;
+
+        UnsubscribeBarrier();
+        subscribedBarrier = target;
+        subscribedBarrier.HpDepleted += OnBarrierHpDepleted;
+    }
+
+    private void UnsubscribeBarrier()
+    {
+        if (subscribedBarrier == null) return;
+        subscribedBarrier.HpDepleted -= OnBarrierHpDepleted;
+        subscribedBarrier = null;
+    }
+
+    private void SetupResultPanel()
+    {
+        if (resultPanel == null)
+        {
+            Transform gaugeRoot = GetStatusGaugeRoot();
+            Transform parent = gaugeRoot != null ? gaugeRoot.parent : null;
+            Transform found = parent != null ? parent.Find("Result") : null;
+            if (found != null)
+                resultPanel = found.gameObject;
+        }
+
+        if (resultPanel == null) return;
+
+        if (resultReturnButton != null)
+        {
+            resultReturnButton.onClick.RemoveListener(OnResultReturnClicked);
+            resultReturnButton.onClick.AddListener(OnResultReturnClicked);
+        }
+
+        resultPanel.SetActive(false);
+    }
+
+    private void OnBarrierHpDepleted()
+    {
+        if (isGameOver) return;
+        isGameOver = true;
+
+        inCombat = false;
+        pendingReturnToPrepare = false;
+        pendingEnhanceCount = 0;
+        isEnhanceOpen = false;
+        UnsubscribeCombatEvents();
+        SetEnhanceActive(false);
+
+        spawner.enabled = false;
+        playerShooter.enabled = false;
+
+        ShowResult();
+        Time.timeScale = 0f;
+    }
+
+    private void ShowResult()
+    {
+        if (resultStageText != null)
+            resultStageText.text = $"스테이지  {displayedRound}";
+        if (resultLevelText != null)
+            resultLevelText.text = $"레벨  {level}";
+        if (resultGoldText != null)
+            resultGoldText.text = $"골드  {gold.ToString("N0", CultureInfo.InvariantCulture)}";
+
+        if (resultPanel != null)
+        {
+            resultPanel.transform.SetAsLastSibling();
+            resultPanel.SetActive(true);
+        }
+    }
+
+    private void OnResultReturnClicked()
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(titleSceneName);
     }
 
     private static int ParseEffectAmount(string value, int defaultAmount)

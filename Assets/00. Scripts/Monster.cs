@@ -729,6 +729,23 @@ public class Monster : MonoBehaviour
         hpGaugeTween = null;
     }
 
+    /// <summary>
+    /// StageSpawn 시트의 스테이지별 스탯으로 덮어쓴다. 음수 값은 "지정 안 함"이라 기본값을 유지한다.
+    /// </summary>
+    public void ApplyStageOverride(int stageHp, int stageAtk, int stageGold, int stageExp)
+    {
+        if (stageHp > 0)
+        {
+            maxHp = stageHp;
+            hp = stageHp;
+            RefreshHpGauge(animate: false);
+        }
+
+        if (stageAtk > 0) attackPower = stageAtk;
+        if (stageGold >= 0) dropGold = stageGold;
+        if (stageExp >= 0) dropExp = stageExp;
+    }
+
     private void ApplyGameData()
     {
         if (!GameDataRepository.TryGetMonsterByPrefabKey(GetTypeKey(), out MonsterData monsterData) &&

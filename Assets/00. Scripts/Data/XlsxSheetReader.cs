@@ -229,6 +229,19 @@ public static class XlsxSheetReader
     private static string ReadCellValue(XElement cellElement, List<string> sharedStrings)
     {
         string type = (string)cellElement.Attribute("t");
+        if (type == "inlineStr")
+        {
+            StringBuilder inline = new();
+            XElement inlineString = cellElement.Element(MainNs + "is");
+            if (inlineString != null)
+            {
+                foreach (XElement text in inlineString.Descendants(MainNs + "t"))
+                    inline.Append(text.Value);
+            }
+
+            return inline.ToString();
+        }
+
         XElement valueElement = cellElement.Element(MainNs + "v");
         if (valueElement == null) return string.Empty;
 
@@ -238,12 +251,6 @@ public static class XlsxSheetReader
             if (sharedIndex >= 0 && sharedIndex < sharedStrings.Count)
                 return sharedStrings[sharedIndex];
             return string.Empty;
-        }
-
-        if (type == "inlineStr")
-        {
-            XElement text = cellElement.Element(MainNs + "is")?.Element(MainNs + "t");
-            return text?.Value ?? string.Empty;
         }
 
         return raw;

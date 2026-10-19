@@ -11,6 +11,7 @@ public static class GameDataRepository
     private const string MonsterSheetName = "Monster";
     private const string StageSheetName = "Stage";
     private const string StageSpawnSheetName = "StageSpawn";
+    private const string LevelCurveSheetName = "LevelCurve";
     private const string EnhanceOptionSheetName = "EnhanceOption";
     private const string EnhanceOptionEffectSheetName = "EnhanceOptionEffect";
     private const string LocalizationSheetName = "Localization";
@@ -27,6 +28,8 @@ public static class GameDataRepository
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<int, StageData> StagesByOrder = new();
     private static readonly List<StageSpawnEntry> StageSpawns = new();
+    private static readonly Dictionary<int, int> ExpToNextByLevel = new();
+    private static int maxCurveLevel;
     private static readonly List<EnhanceOptionData> EnhanceOptions = new();
     private static readonly Dictionary<string, List<EnhanceOptionEffectData>> EnhanceEffectsByOptionId =
         new(StringComparer.OrdinalIgnoreCase);
@@ -57,6 +60,8 @@ public static class GameDataRepository
         StagesById.Clear();
         StagesByOrder.Clear();
         StageSpawns.Clear();
+        ExpToNextByLevel.Clear();
+        maxCurveLevel = 0;
         EnhanceOptions.Clear();
         EnhanceEffectsByOptionId.Clear();
         LocalizationByKey.Clear();
@@ -75,6 +80,7 @@ public static class GameDataRepository
         LoadMonsterSheet(path);
         LoadStageSheet(path);
         LoadStageSpawnSheet(path);
+        LoadLevelCurveSheet(path);
         LoadEnhanceOptionSheet(path);
         LoadEnhanceOptionEffectSheet(path);
         LoadLocalizationSheet(path);
@@ -161,6 +167,38 @@ public static class GameDataRepository
 
             StageSpawns.Add(entry);
         }
+    }
+
+    private static void LoadLevelCurveSheet(string path)
+    {
+        if (!XlsxSheetReader.TryReadSheet(path, LevelCurveSheetName, out List<Dictionary<string, string>> rows, out string error))
+        {
+            Debug.LogWarning($"[GameData] LevelCurve sheet load failed: {error}");
+            return;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            int level = ParseInt(Get(rows[i], "Level"));
+            int expToNext = ParseInt(Get(rows[i], "ExpToNext"));
+            if (level <= 0 || expToNext <= 0) continue;
+
+            ExpToNextByLevel[level] = expToNext;
+            if (level > maxCurveLevel) maxCurveLevel = level;
+        }
+    }
+
+    /// <summary>
+    /// currentLevel에서 다음 레벨까지 필요한 경험치. 시트 범위를 넘어서면 마지막 행 값을 사용한다.
+    /// </summary>
+    public static bool TryGetExpToNext(int currentLevel, out int expToNext)
+    {
+        EnsureLoaded();
+        expToNext = 0;
+        if (ExpToNextByLevel.Count == 0) return false;
+
+        int level = Mathf.Clamp(currentLevel, 1, maxCurveLevel);
+        return ExpToNextByLevel.TryGetValue(level, out expToNext);
     }
 
     private static void LoadEnhanceOptionSheet(string path)
@@ -427,7 +465,8 @@ public static class GameDataRepository
             ExtraDamage = ParseFloat(Get(row, "ExtraDamage")),
             Critical = ParseFloat(Get(row, "Critical")),
             ExtraAddRange = ParseFloat(Get(row, "ExtraRange", "ExtraAddRange")),
-            HasCombatStats = hasCombatStats
+            HasCombatStats = hasCombatStats,
+            ShopWeight = ParseOptionalFloat(Get(row, "ShopWeight"), 1f)
         };
 
         return true;
@@ -469,7 +508,8 @@ public static class GameDataRepository
         {
             Id = id.Trim(),
             Order = ParseInt(Get(row, "Order")),
-            SpawnInterval = ParseFloat(Get(row, "SpawnInterval"))
+            SpawnInterval = ParseFloat(Get(row, "SpawnInterval")),
+            ShopGradeWeights = ParseShopGradeWeights(row)
         };
 
         return true;
@@ -488,10 +528,41 @@ public static class GameDataRepository
         {
             StageId = stageId.Trim(),
             MonsterId = monsterId.Trim(),
-            Count = Mathf.Max(0, ParseInt(Get(row, "Count")))
+            Count = Mathf.Max(0, ParseInt(Get(row, "Count"))),
+            Hp = ParseOptionalInt(Get(row, "HP", "Hp")),
+            Atk = ParseOptionalInt(Get(row, "Atk")),
+            Gold = ParseOptionalInt(Get(row, "Gold")),
+            Exp = ParseOptionalInt(Get(row, "Exp"))
         };
 
         return entry.Count > 0;
+    }
+
+    private static float[] ParseShopGradeWeights(Dictionary<string, string> row)
+    {
+        float[] weights = new float[5];
+        bool any = false;
+        for (int i = 0; i < weights.Length; i++)
+        {
+            string text = Get(row, $"ShopGrade{i + 1}");
+            if (string.IsNullOrWhiteSpace(text)) continue;
+
+            weights[i] = Mathf.Max(0f, ParseFloat(text));
+            any = true;
+        }
+
+        return any ? weights : null;
+    }
+
+    private static int ParseOptionalInt(string text)
+    {
+        return string.IsNullOrWhiteSpace(text) ? StageSpawnEntry.Unspecified : Mathf.Max(0, ParseInt(text));
+    }
+
+    private static float ParseOptionalFloat(string text, float fallback)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return fallback;
+        return Mathf.Max(0f, ParseFloat(text));
     }
 
     private static bool TryParseEnhanceOptionRow(Dictionary<string, string> row, out EnhanceOptionData option)

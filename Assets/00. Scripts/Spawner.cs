@@ -15,7 +15,7 @@ public class Spawner : MonoBehaviour
     private int plannedSpawnCount;
     private float activeSpawnInterval;
     private int pendingStageOrder;
-    private readonly Queue<string> spawnQueue = new();
+    private readonly Queue<StageSpawnEntry> spawnQueue = new();
 
     public bool HasFinishedSpawning =>
         debugMode ? spawnedCount >= maxSpawnCount : spawnedCount >= plannedSpawnCount;
@@ -69,15 +69,15 @@ public class Spawner : MonoBehaviour
         if (spawnTimer < activeSpawnInterval) return;
 
         spawnTimer = 0f;
-        string monsterId = spawnQueue.Dequeue();
-        Monster prefab = ResolveMonsterPrefab(monsterId);
+        StageSpawnEntry entry = spawnQueue.Dequeue();
+        Monster prefab = ResolveMonsterPrefab(entry.MonsterId);
         if (prefab == null)
         {
             plannedSpawnCount = Mathf.Max(0, plannedSpawnCount - 1);
             return;
         }
 
-        SpawnPrefab(prefab);
+        SpawnPrefab(prefab, entry);
     }
 
     private void BuildStageSpawnQueue(int stageOrder)
@@ -100,19 +100,21 @@ public class Spawner : MonoBehaviour
         {
             StageSpawnEntry entry = entries[i];
             for (int count = 0; count < entry.Count; count++)
-                spawnQueue.Enqueue(entry.MonsterId);
+                spawnQueue.Enqueue(entry);
         }
 
         plannedSpawnCount = spawnQueue.Count;
     }
 
-    private void SpawnPrefab(Monster prefab)
+    private void SpawnPrefab(Monster prefab, StageSpawnEntry entry = null)
     {
         if (prefab == null) return;
 
         Vector3 position = transform.position;
         position.x += SampleSpawnXOffset();
-        Instantiate(prefab, position, Quaternion.identity);
+        Monster spawned = Instantiate(prefab, position, Quaternion.identity);
+        if (entry != null)
+            spawned.ApplyStageOverride(entry.Hp, entry.Atk, entry.Gold, entry.Exp);
         spawnedCount++;
         MonsterSpawned?.Invoke();
     }

@@ -30,6 +30,8 @@ public class Barrier : MonoBehaviour
     public int MaxHp => maxHp;
     public int ContactDamage => contactDamage;
 
+    public event Action HpDepleted;
+
     private void Awake()
     {
         if (hpGauge == null)
@@ -66,6 +68,9 @@ public class Barrier : MonoBehaviour
 
         hp = Mathf.Max(0, hp - amount);
         RefreshVisuals(animateGauge: true);
+
+        if (hp <= 0)
+            HpDepleted?.Invoke();
     }
 
     public void RestoreFullHp()
