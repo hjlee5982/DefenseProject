@@ -145,7 +145,10 @@ public class PlayerShooter : MonoBehaviour
         projectile.ConfigureAdditionalOnHit(weapon.additionalProjectilePrefab, weapon.grade, weapon.category);
 
         if (projectile.Init(target))
+        {
+            CombatAudioPlayer.PlaySwing();
             return true;
+        }
 
         Destroy(projectile.gameObject);
         return false;

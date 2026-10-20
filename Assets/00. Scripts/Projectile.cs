@@ -179,10 +179,21 @@ public class Projectile : MonoBehaviour
         {
             reservationConsumed = true;
             target.TryApplyReservedHit(this, lastHitWasCritical);
+            PlayHitSound();
             Finish();
         }
 
         return true;
+    }
+
+    public void SetSourceCategory(Item.ItemCategory category)
+    {
+        sourceCategory = category;
+    }
+
+    private void PlayHitSound()
+    {
+        CombatAudioPlayer.PlayHit(sourceCategory, isAdditional);
     }
 
     public bool InitFreeFlight(Vector3 moveDirection)
@@ -238,7 +249,10 @@ public class Projectile : MonoBehaviour
 
         int amount = RollHitDamage();
         if (amount > 0 && hitMonster.CanBeTargeted && hitMonster.TryReserve(this, amount))
+        {
             hitMonster.TryApplyReservedHit(this, lastHitWasCritical);
+            PlayHitSound();
+        }
 
         if (!hitMonster.IsDead)
             hitMonster.ApplyKnockback(Vector3.up, activeWaterKnockbackDistance, WaterKnockbackDuration);
@@ -298,7 +312,10 @@ public class Projectile : MonoBehaviour
 
         int amount = RollHitDamage();
         if (amount > 0 && monster.TryReserve(this, amount))
+        {
             monster.TryApplyReservedHit(this, lastHitWasCritical);
+            PlayHitSound();
+        }
 
         if (!monster.IsDead)
             monster.ApplyTemporaryStop(activeRockRootDuration);
@@ -479,6 +496,7 @@ public class Projectile : MonoBehaviour
         {
             reservationConsumed = true;
             monster.TryApplyReservedHit(this, lastHitWasCritical);
+            PlayHitSound();
         }
 
         Finish();
@@ -672,6 +690,8 @@ public class Projectile : MonoBehaviour
 
     private bool TryApplyOneGrimoireHit(Monster monster, int amount)
     {
+        PlayHitSound();
+
         if (!reservationConsumed && target == monster)
         {
             reservationConsumed = true;
@@ -739,6 +759,7 @@ public class Projectile : MonoBehaviour
         if (!monster.TryReserve(this, amount)) return;
 
         monster.TryApplyReservedHit(this, lastHitWasCritical);
+        PlayHitSound();
     }
 
     private void TrySpawnAdditionalProjectile(Monster hitMonster, Vector3 hitPosition)
@@ -851,7 +872,8 @@ public class Projectile : MonoBehaviour
             FireAdditionalScaleStep,
             FireAdditionalBaseRadius,
             FireAdditionalRadiusStep,
-            FireAdditionalSideAngleDegrees);
+            FireAdditionalSideAngleDegrees,
+            sourceCategory);
     }
 
     private void SpawnIceAdditionalProjectiles(Vector3 hitPosition)
@@ -878,6 +900,7 @@ public class Projectile : MonoBehaviour
     {
         additional.ApplyDamage(damage);
         additional.ApplyCriticalChance(criticalChance);
+        additional.SetSourceCategory(sourceCategory);
     }
 
     private static Monster FindNearestMonster(Vector3 origin, float searchRange, Monster exclude)
@@ -992,7 +1015,8 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
         float scaleStep,
         float baseRadius,
         float radiusStep,
-        float sideAngleDegrees)
+        float sideAngleDegrees,
+        Item.ItemCategory sourceCategory)
     {
         StartCoroutine(Run(
             prefab,
@@ -1007,7 +1031,8 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
             scaleStep,
             baseRadius,
             radiusStep,
-            sideAngleDegrees));
+            sideAngleDegrees,
+            sourceCategory));
     }
 
     private IEnumerator Run(
@@ -1023,7 +1048,8 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
         float scaleStep,
         float baseRadius,
         float radiusStep,
-        float sideAngleDegrees)
+        float sideAngleDegrees,
+        Item.ItemCategory sourceCategory)
     {
         if (prefab == null)
         {
@@ -1049,6 +1075,7 @@ internal sealed class FireAdditionalSequence : MonoBehaviour
                 Projectile additional = Instantiate(prefab, spawnPosition, rotation);
                 additional.ApplyDamage(damage);
                 additional.ApplyCriticalChance(criticalChance);
+                additional.SetSourceCategory(sourceCategory);
                 additional.transform.localScale = prefabScale * scaleMultiplier;
 
                 if (!additional.InitInstantInPlace())

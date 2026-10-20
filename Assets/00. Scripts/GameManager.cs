@@ -113,7 +113,8 @@ public class GameManager : MonoBehaviour
         UnsubscribeBarrier();
         if (resultReturnButton != null)
             resultReturnButton.onClick.RemoveListener(OnResultReturnClicked);
-        Time.timeScale = 1f;
+        SetSimulationPaused(false);
+        RestoreDesiredTimeScale(forceOne: true);
         if (inventoryManager != null)
         {
             inventoryManager.ExpansionStateChanged -= UpdateNextButtonState;
@@ -167,6 +168,9 @@ public class GameManager : MonoBehaviour
         uiBackground.SetActive(false);
         equipSlot.gameObject.SetActive(true);
         ShowRound(clearedStageCount + 1);
+        SetCombatUtilityUiVisible(true);
+        SetSimulationPaused(false);
+        RestoreDesiredTimeScale();
 
         aliveMonsters = 0;
         inCombat = true;
@@ -192,6 +196,10 @@ public class GameManager : MonoBehaviour
 
         equipSlot.gameObject.SetActive(false);
         SetCombatHudActive(false);
+        SetCombatUtilityUiVisible(false);
+        SetSimulationPaused(false);
+        // Keep DesiredSpeed for next combat, but run prepare at 1x.
+        Time.timeScale = 1f;
         inventoryManager.gameObject.SetActive(true);
         nextButton.SetActive(true);
         uiBackground.SetActive(true);
@@ -681,7 +689,8 @@ public class GameManager : MonoBehaviour
         playerShooter.enabled = false;
 
         ShowResult();
-        Time.timeScale = 0f;
+        SetCombatUtilityUiVisible(false);
+        SetSimulationPaused(true);
     }
 
     private void ShowResult()
@@ -702,7 +711,8 @@ public class GameManager : MonoBehaviour
 
     private void OnResultReturnClicked()
     {
-        Time.timeScale = 1f;
+        SetSimulationPaused(false);
+        RestoreDesiredTimeScale(forceOne: true);
         SceneManager.LoadScene(titleSceneName);
     }
 
@@ -721,7 +731,8 @@ public class GameManager : MonoBehaviour
 
         if (!isEnhanceOpen && pendingEnhanceCount <= 0)
         {
-            Time.timeScale = 1f;
+            SetSimulationPaused(false);
+            RestoreDesiredTimeScale();
             SetEnhanceActive(false);
             return;
         }
@@ -735,7 +746,8 @@ public class GameManager : MonoBehaviour
 
         isEnhanceOpen = false;
         SetEnhanceActive(false);
-        Time.timeScale = 1f;
+        SetSimulationPaused(false);
+        RestoreDesiredTimeScale();
 
         if (pendingReturnToPrepare)
         {
@@ -752,7 +764,41 @@ public class GameManager : MonoBehaviour
             currentEnhanceOptions[i] = i < picked.Count ? picked[i] : null;
 
         SetEnhanceActive(true);
-        Time.timeScale = 0f;
+        SetSimulationPaused(true);
+    }
+
+    private static void SetSimulationPaused(bool paused)
+    {
+        if (GameSpeedController.Instance != null)
+            GameSpeedController.Instance.SetSimulationPaused(paused);
+        else
+            Time.timeScale = paused ? 0f : 1f;
+    }
+
+    private static void RestoreDesiredTimeScale(bool forceOne = false)
+    {
+        if (forceOne)
+        {
+            if (GameSpeedController.Instance != null)
+                GameSpeedController.Instance.SetDesiredSpeed(1f);
+            else
+                Time.timeScale = 1f;
+            return;
+        }
+
+        if (GameSpeedController.Instance != null)
+            GameSpeedController.Instance.ApplyTimeScale();
+        else
+            Time.timeScale = 1f;
+    }
+
+    private static void SetCombatUtilityUiVisible(bool visible)
+    {
+        if (GameSpeedController.Instance != null)
+            GameSpeedController.Instance.SetVisible(visible);
+
+        if (EnhanceStatusController.Instance != null)
+            EnhanceStatusController.Instance.SetVisible(visible);
     }
 
     private void SubscribeCombatEvents()
