@@ -28,7 +28,7 @@ public class InventoryManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI expansionCountText;
 
     [Header("Optimize")]
-    [SerializeField] private int optimizeAvailableCount = 0;
+    [SerializeField] private int optimizeAvailableCount = 3;
     [SerializeField] private TextMeshProUGUI optimizeCountText;
 
     [Header("Shop Reroll")]
@@ -71,7 +71,6 @@ public class InventoryManager : MonoBehaviour
     private readonly List<RaycastResult> raycastResults = new();
     private Item draggingItem;
     private int remainingOptimizeCount;
-    private int shopStageOrder;
     private GameManager gameManager;
 
     public float BagCellSize => Bag.CellSize;
@@ -811,14 +810,6 @@ public class InventoryManager : MonoBehaviour
         return picked;
     }
 
-    /// <summary>
-    /// 다음에 진행할 스테이지(0부터). 상점 등급 확률을 Stage 시트에서 조회하는 데 쓴다.
-    /// </summary>
-    public void SetShopStageOrder(int stageOrder)
-    {
-        shopStageOrder = Mathf.Max(0, stageOrder);
-    }
-
     private Item PickWeightedShopItem(List<Item> candidates)
     {
         float total = 0f;
@@ -850,17 +841,7 @@ public class InventoryManager : MonoBehaviour
 
     private float[] ResolveGradeChances()
     {
-        float[] baseChances;
-        if (GameDataRepository.TryGetStageByOrder(shopStageOrder, out StageData stage) &&
-            stage.ShopGradeWeights != null)
-        {
-            baseChances = stage.ShopGradeWeights;
-        }
-        else
-        {
-            baseChances = new[] { grade1Chance, grade2Chance, grade3Chance, grade4Chance, grade5Chance };
-        }
-
+        float[] baseChances = { grade1Chance, grade2Chance, grade3Chance, grade4Chance, grade5Chance };
         return TitleEnhanceProgress.ApplyProductivityToGradeWeights(baseChances);
     }
 
