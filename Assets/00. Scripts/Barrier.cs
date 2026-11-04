@@ -12,9 +12,14 @@ public class Barrier : MonoBehaviour
         public Sprite sprite;
     }
 
+    private const int BufferPercentPerLevel = 20;
+    private static readonly Color BufferGaugeColor = new Color(78f / 255f, 221f / 255f, 252f / 255f, 1f);
+
     [SerializeField] private int maxHp = 100;
     [SerializeField] private int contactDamage = 10;
+    private int configuredMaxHp;
     [SerializeField] private Slider hpGauge;
+    [SerializeField] private Image bufferGaugeFillImage;
     [SerializeField] private float hpGaugeTweenDuration = 0.25f;
     [SerializeField] private Color hpGaugeFullColor = new Color(0.82f, 0.95f, 0.48f, 1f);
     [SerializeField] private Color hpGaugeEmptyColor = new Color(1f, 0.42f, 0.42f, 1f);
@@ -22,11 +27,16 @@ public class Barrier : MonoBehaviour
     [SerializeField] private Sprite fullHpSprite;
     [SerializeField] private HpSpriteStage[] damagedSprites;
 
-    private int hp;
+    private int coreHp;
+    private int bufferHp;
+    private int coreMaxHp;
+    private int bufferMaxHp;
+    private int reinforceLevel;
     private Tween hpGaugeTween;
+    private Tween bufferGaugeTween;
     private Image hpGaugeFillImage;
 
-    public int Hp => hp;
+    public int Hp => coreHp + bufferHp;
     public int MaxHp => maxHp;
     public int ContactDamage => contactDamage;
 
@@ -43,8 +53,27 @@ public class Barrier : MonoBehaviour
 
         EnsureHpGaugeColors();
         ResolveHpGaugeFillImage();
-        hp = Mathf.Max(1, maxHp);
+        EnsureBufferGaugeFill();
+        configuredMaxHp = Mathf.Max(1, maxHp);
+        ApplyTitleBarrierBonus();
+        InitializeHpPools();
         RefreshVisuals(animateGauge: false);
+    }
+
+    private void ApplyTitleBarrierBonus()
+    {
+        float multiplier = 1f + TitleEnhanceProgress.CurrentBarrierPercent / 100f;
+        maxHp = Mathf.Max(1, Mathf.RoundToInt(configuredMaxHp * multiplier));
+        reinforceLevel = Mathf.Max(0, TitleEnhanceProgress.GetLevel(TitleEnhanceProgress.BarrierId));
+    }
+
+    private void InitializeHpPools()
+    {
+        int bufferPercent = Mathf.Clamp(reinforceLevel * BufferPercentPerLevel, 0, 100);
+        bufferMaxHp = Mathf.Clamp(Mathf.RoundToInt(maxHp * (bufferPercent / 100f)), 0, maxHp);
+        coreMaxHp = Mathf.Max(0, maxHp - bufferMaxHp);
+        bufferHp = bufferMaxHp;
+        coreHp = coreMaxHp;
     }
 
     private void OnDestroy()
@@ -64,18 +93,29 @@ public class Barrier : MonoBehaviour
 
     public void TakeDamage(int amount)
     {
-        if (amount <= 0 || hp <= 0) return;
+        if (amount <= 0 || Hp <= 0) return;
 
-        hp = Mathf.Max(0, hp - amount);
+        int remaining = amount;
+        if (bufferHp > 0)
+        {
+            int absorbed = Mathf.Min(bufferHp, remaining);
+            bufferHp -= absorbed;
+            remaining -= absorbed;
+        }
+
+        if (remaining > 0)
+            coreHp = Mathf.Max(0, coreHp - remaining);
+
         RefreshVisuals(animateGauge: true);
 
-        if (hp <= 0)
+        if (Hp <= 0)
             HpDepleted?.Invoke();
     }
 
     public void RestoreFullHp()
     {
-        hp = Mathf.Max(1, maxHp);
+        bufferHp = bufferMaxHp;
+        coreHp = coreMaxHp;
         RefreshVisuals(animateGauge: true);
     }
 
@@ -90,22 +130,73 @@ public class Barrier : MonoBehaviour
         if (hpGauge == null) return;
 
         ResolveHpGaugeFillImage();
+        EnsureBufferGaugeFill();
         hpGauge.minValue = 0f;
         hpGauge.maxValue = maxHp;
         KillHpGaugeTween();
 
+        // 완충이 남아 있는 동안 본래 게이지는 줄지 않는다 (bufferMax + core).
+        float displayHp = bufferMaxHp + coreHp;
+        float bufferRatio = maxHp > 0 ? bufferHp / (float)maxHp : 0f;
+        bool showBuffer = bufferMaxHp > 0;
+
+        if (bufferGaugeFillImage != null)
+        {
+            bufferGaugeFillImage.color = BufferGaugeColor;
+            bufferGaugeFillImage.enabled = showBuffer && bufferRatio > 0.0001f;
+        }
+
         if (!animate || !hpGauge.gameObject.activeInHierarchy)
         {
-            hpGauge.value = hp;
-            ApplyHpGaugeColor(GetHpRatio(hp));
+            hpGauge.value = displayHp;
+            ApplyHpGaugeColor(GetHpRatio(displayHp));
+            SetBufferFillRatio(bufferRatio);
             return;
         }
 
+        float startBuffer = GetBufferFillRatio();
         hpGaugeTween = hpGauge
-            .DOValue(hp, hpGaugeTweenDuration)
+            .DOValue(displayHp, hpGaugeTweenDuration)
             .SetEase(Ease.OutQuad)
             .SetUpdate(true)
             .OnUpdate(() => ApplyHpGaugeColor(GetHpRatio(hpGauge.value)));
+
+        if (showBuffer && bufferGaugeFillImage != null)
+        {
+            bufferGaugeTween = DOTween
+                .To(() => startBuffer, SetBufferFillRatio, bufferRatio, hpGaugeTweenDuration)
+                .SetEase(Ease.OutQuad)
+                .SetUpdate(true);
+        }
+        else
+        {
+            SetBufferFillRatio(0f);
+        }
+    }
+
+    private float GetBufferFillRatio()
+    {
+        if (bufferGaugeFillImage == null)
+            return 0f;
+
+        RectTransform rt = bufferGaugeFillImage.rectTransform;
+        return Mathf.Clamp01(rt.anchorMax.x);
+    }
+
+    private void SetBufferFillRatio(float ratio)
+    {
+        if (bufferGaugeFillImage == null)
+            return;
+
+        float clamped = Mathf.Clamp01(ratio);
+        RectTransform rt = bufferGaugeFillImage.rectTransform;
+        // 왼쪽 고정, 가로 비율만 조절 (Sliced)
+        rt.anchorMin = new Vector2(0f, 0f);
+        rt.anchorMax = new Vector2(clamped, 1f);
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+        bufferGaugeFillImage.color = BufferGaugeColor;
+        bufferGaugeFillImage.enabled = bufferMaxHp > 0 && clamped > 0.0001f;
     }
 
     private void ResolveHpGaugeFillImage()
@@ -114,6 +205,46 @@ public class Barrier : MonoBehaviour
         if (hpGauge == null || hpGauge.fillRect == null) return;
 
         hpGaugeFillImage = hpGauge.fillRect.GetComponent<Image>();
+    }
+
+    private void EnsureBufferGaugeFill()
+    {
+        if (hpGauge == null || hpGauge.fillRect == null)
+            return;
+
+        Transform fillArea = hpGauge.fillRect.parent;
+        if (fillArea == null) return;
+
+        if (bufferGaugeFillImage == null)
+        {
+            Transform existing = fillArea.Find("BufferFill");
+            GameObject bufferGo;
+            if (existing != null)
+            {
+                bufferGo = existing.gameObject;
+            }
+            else
+            {
+                bufferGo = new GameObject("BufferFill", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                bufferGo.transform.SetParent(fillArea, false);
+            }
+
+            bufferGo.transform.SetAsLastSibling();
+            bufferGaugeFillImage = bufferGo.GetComponent<Image>();
+        }
+
+        RectTransform rt = bufferGaugeFillImage.rectTransform;
+        rt.localScale = Vector3.one;
+        rt.pivot = new Vector2(0f, 0.5f);
+
+        Image source = hpGauge.fillRect.GetComponent<Image>();
+        if (source != null && source.sprite != null)
+            bufferGaugeFillImage.sprite = source.sprite;
+
+        bufferGaugeFillImage.type = Image.Type.Sliced;
+        bufferGaugeFillImage.pixelsPerUnitMultiplier = 1.5f;
+        bufferGaugeFillImage.color = BufferGaugeColor;
+        bufferGaugeFillImage.raycastTarget = false;
     }
 
     private void EnsureHpGaugeColors()
@@ -154,9 +285,17 @@ public class Barrier : MonoBehaviour
 
     private void KillHpGaugeTween()
     {
-        if (hpGaugeTween == null) return;
-        hpGaugeTween.Kill();
-        hpGaugeTween = null;
+        if (hpGaugeTween != null)
+        {
+            hpGaugeTween.Kill();
+            hpGaugeTween = null;
+        }
+
+        if (bufferGaugeTween != null)
+        {
+            bufferGaugeTween.Kill();
+            bufferGaugeTween = null;
+        }
     }
 
     private void RefreshSprite()
@@ -168,7 +307,7 @@ public class Barrier : MonoBehaviour
 
     private Sprite ResolveSpriteForCurrentHp()
     {
-        float hpPercent = maxHp > 0 ? (hp * 100f) / maxHp : 0f;
+        float hpPercent = maxHp > 0 ? (Hp * 100f) / maxHp : 0f;
         Sprite selected = fullHpSprite;
         int matchedPercent = int.MaxValue;
 

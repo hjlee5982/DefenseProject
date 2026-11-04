@@ -13,6 +13,8 @@ public class EnhanceStatusController : MonoBehaviour
 
     public static EnhanceStatusController Instance { get; private set; }
 
+    private bool isHudVisible;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -64,13 +66,13 @@ public class EnhanceStatusController : MonoBehaviour
 
     public void SetVisible(bool active)
     {
+        isHudVisible = active;
         ResolveReferences();
-
-        if (statusButtonRoot != null)
-            statusButtonRoot.SetActive(active);
 
         if (!active)
             SetPanelOpen(false);
+        else
+            ApplyButtonVisibility();
     }
 
     public void ClosePanel()
@@ -86,7 +88,7 @@ public class EnhanceStatusController : MonoBehaviour
         SetPanelOpen(!statusPanel.activeSelf);
     }
 
-    // Opening the status window pauses the game; closing it resumes at the previously selected speed.
+    // Opening the status window pauses the game and hides the 강화/배속 buttons so they do not sit on top of the panel.
     private void SetPanelOpen(bool open)
     {
         if (statusPanel != null)
@@ -96,8 +98,22 @@ public class EnhanceStatusController : MonoBehaviour
                 statusPanel.transform.SetAsLastSibling();
         }
 
+        ApplyButtonVisibility();
+
         if (GameSpeedController.Instance != null)
             GameSpeedController.Instance.SetOverlayPaused(open && statusPanel != null);
+    }
+
+    private void ApplyButtonVisibility()
+    {
+        bool panelOpen = statusPanel != null && statusPanel.activeSelf;
+        bool showButtons = isHudVisible && !panelOpen;
+
+        if (statusButtonRoot != null)
+            statusButtonRoot.SetActive(showButtons);
+
+        if (GameSpeedController.Instance != null)
+            GameSpeedController.Instance.SetVisible(showButtons);
     }
 
     private void ResolveReferences()

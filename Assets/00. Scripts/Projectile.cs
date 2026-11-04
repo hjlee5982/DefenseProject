@@ -824,8 +824,9 @@ public class Projectile : MonoBehaviour
     {
         Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
         ConfigureSpawnedAdditional(additional);
-        float pullSpeed = HasEnhancedAdditional ? WindPullSpeed * 2f : WindPullSpeed;
-        additional.EnableWindPull(pullSpeed);
+        // 4등급: 추가 공격만. 5등급: 기존 4등급과 동일한 흡인.
+        if (HasEnhancedAdditional)
+            additional.EnableWindPull(WindPullSpeed);
         if (!additional.InitInstantInPlace())
             Destroy(additional.gameObject);
     }

@@ -32,11 +32,13 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI resultStageText;
     [SerializeField] private TextMeshProUGUI resultLevelText;
     [SerializeField] private TextMeshProUGUI resultGoldText;
+    [SerializeField] private TextMeshProUGUI resultDiamondText;
     [SerializeField] private Button resultReturnButton;
     [SerializeField] private string titleSceneName = "TitleScene";
 
     private const int ExpPerKill = 10;
     private const int DefaultExpToNextLevel = 100;
+    private const int FinalStageNumber = 100;
 
     private bool inCombat;
     private int aliveMonsters;
@@ -51,8 +53,10 @@ public class GameManager : MonoBehaviour
 
     private Button nextButtonComponent;
     private Button[] enhanceButtons;
-    private readonly UnityEngine.Events.UnityAction[] enhanceButtonActions = new UnityEngine.Events.UnityAction[3];
-    private readonly EnhanceOptionData[] currentEnhanceOptions = new EnhanceOptionData[3];
+    private readonly UnityEngine.Events.UnityAction[] enhanceButtonActions =
+        new UnityEngine.Events.UnityAction[EnhancePanelFiller.MaxOptionSlots];
+    private readonly EnhanceOptionData[] currentEnhanceOptions =
+        new EnhanceOptionData[EnhancePanelFiller.MaxOptionSlots];
     private Tween expGaugeTween;
     private int displayedRound = 1;
     private bool isGameOver;
@@ -149,7 +153,7 @@ public class GameManager : MonoBehaviour
     {
         if (inventoryManager.IsClearPrepareMode)
         {
-            inventoryManager.ApplyClearBans();
+            inventoryManager.ApplyClearSlots();
         }
 
         if (inventoryManager.IsExpansionPrepareMode)
@@ -430,8 +434,8 @@ public class GameManager : MonoBehaviour
         UnwireEnhanceButtons();
         if (enhancePanel == null) return;
 
-        enhanceButtons = new Button[3];
-        for (int i = 0; i < 3; i++)
+        enhanceButtons = new Button[EnhancePanelFiller.MaxOptionSlots];
+        for (int i = 0; i < EnhancePanelFiller.MaxOptionSlots; i++)
         {
             Transform optionRoot = enhancePanel.transform.Find($"Option_{i}");
             if (optionRoot == null) continue;
@@ -475,7 +479,18 @@ public class GameManager : MonoBehaviour
 
     private void SetEnhanceActive(bool active)
     {
-        if (enhancePanel != null) enhancePanel.SetActive(active);
+        if (enhancePanel != null)
+        {
+            enhancePanel.SetActive(active);
+            if (active)
+                enhancePanel.transform.SetAsLastSibling();
+        }
+
+        // 강화 선택창이 떠 있는 동안에는 강화/배속 버튼을 숨기고, 닫히면 전투 중일 때만 다시 보여준다.
+        if (active)
+            SetCombatUtilityUiVisible(false);
+        else if (inCombat && !isGameOver)
+            SetCombatUtilityUiVisible(true);
     }
 
     private void RefreshCombatHudTexts(bool animateExpGauge = false, int levelUps = 0)
@@ -675,6 +690,14 @@ public class GameManager : MonoBehaviour
 
     private void OnBarrierHpDepleted()
     {
+        EndRun();
+    }
+
+    /// <summary>
+    /// 배리어 파괴 또는 최종 스테이지 클리어 시 공통 게임오버(결과창) 처리.
+    /// </summary>
+    private void EndRun()
+    {
         if (isGameOver) return;
         isGameOver = true;
 
@@ -693,20 +716,47 @@ public class GameManager : MonoBehaviour
         SetSimulationPaused(true);
     }
 
+    private void FinishStageClear()
+    {
+        if (displayedRound >= FinalStageNumber)
+        {
+            EndRun();
+            return;
+        }
+
+        ReturnToPrepare();
+    }
+
     private void ShowResult()
     {
         if (resultStageText != null)
-            resultStageText.text = $"스테이지  {displayedRound}";
+            resultStageText.text = $"스테이지\n{displayedRound}";
         if (resultLevelText != null)
-            resultLevelText.text = $"레벨  {level}";
+            resultLevelText.text = $"레벨\n{level}";
         if (resultGoldText != null)
-            resultGoldText.text = $"골드  {gold.ToString("N0", CultureInfo.InvariantCulture)}";
+            resultGoldText.text = $"골드\n{gold.ToString("N0", CultureInfo.InvariantCulture)}";
+
+        int gainedDiamond = CalculateDiamondReward(gold, displayedRound);
+        TitleEnhanceProgress.AddDiamond(gainedDiamond);
+        if (resultDiamondText != null)
+            resultDiamondText.text = $"다이아몬드\n{gainedDiamond.ToString("N0", CultureInfo.InvariantCulture)}";
 
         if (resultPanel != null)
         {
             resultPanel.transform.SetAsLastSibling();
             resultPanel.SetActive(true);
         }
+    }
+
+    /// <summary>
+    /// 획득 다이아몬드 = 총 골드 × 스테이지%.
+    /// </summary>
+    private static int CalculateDiamondReward(int totalGold, int stage)
+    {
+        if (totalGold <= 0 || stage <= 0)
+            return 0;
+
+        return Mathf.Max(0, totalGold * stage / 100);
     }
 
     private void OnResultReturnClicked()
@@ -752,14 +802,16 @@ public class GameManager : MonoBehaviour
         if (pendingReturnToPrepare)
         {
             pendingReturnToPrepare = false;
-            ReturnToPrepare();
+            FinishStageClear();
         }
     }
 
     private void ShowEnhanceChoices()
     {
         ResolveEnhancePanel();
-        List<EnhanceOptionData> picked = EnhancePanelFiller.FillRandomOptions(enhancePanel, optionCount: 3);
+        List<EnhanceOptionData> picked = EnhancePanelFiller.FillRandomOptions(
+            enhancePanel,
+            TitleEnhanceProgress.GetEnhanceChoiceCount());
         for (int i = 0; i < currentEnhanceOptions.Length; i++)
             currentEnhanceOptions[i] = i < picked.Count ? picked[i] : null;
 
@@ -799,6 +851,9 @@ public class GameManager : MonoBehaviour
 
         if (EnhanceStatusController.Instance != null)
             EnhanceStatusController.Instance.SetVisible(visible);
+
+        if (GameSettingsUI.Instance != null)
+            GameSettingsUI.Instance.SetVisible(visible);
     }
 
     private void SubscribeCombatEvents()
@@ -827,6 +882,8 @@ public class GameManager : MonoBehaviour
 
         int gainedGold = monster != null ? Mathf.Max(0, monster.DropGold) : 0;
         int gainedExp = monster != null ? Mathf.Max(0, monster.DropExp) : ExpPerKill;
+        gainedGold = TitleEnhanceProgress.ApplyEfficiencyBonus(gainedGold);
+        gainedExp = TitleEnhanceProgress.ApplyEfficiencyBonus(gainedExp);
 
         gold += gainedGold;
         exp += gainedExp;
@@ -863,7 +920,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        ReturnToPrepare();
+        FinishStageClear();
     }
 
     private static void ClearProjectiles()

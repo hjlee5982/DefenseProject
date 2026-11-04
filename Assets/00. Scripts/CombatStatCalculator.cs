@@ -6,16 +6,19 @@ using UnityEngine;
 /// ATK = baseDamage
 ///     * (1 + ExtraDamage% / 100)
 ///     * (1 + (AttackUp + AttackUp_Element)% / 100)
+///     * (1 + TitleMagic% / 100)
 ///
 /// RNG = baseRange * (1 + ExtraRange% / 100)
 ///
 /// INT = baseFireInterval
 ///     * (1 - ExtraFireInterval% / 100)
 ///     / (1 + (AttackSpeedUp + SpeedUp_Element)% / 100)
+///     / (1 + TitleMagic% / 100)
 ///
 /// CRIT chance = Critical% / 100  (damage x2 on proc)
 ///
 /// base* values already include item grade scaling (AddRange/AddDamage/AddFireInterval).
+/// TitleMagic comes from TitleScene Reinforce (마력 강화).
 /// Grimoire maps to Dark enhance bonuses.
 /// </summary>
 public static class CombatStatCalculator
@@ -32,6 +35,7 @@ public static class CombatStatCalculator
 
         float enhanceAttackPercent = enhance != null ? enhance.GetAttackPercent(item.Category) : 0f;
         value = CombatBuffUtility.ApplyIncreasePercent(value, enhanceAttackPercent);
+        value = CombatBuffUtility.ApplyIncreasePercent(value, TitleEnhanceProgress.CurrentMagicPercent);
 
         return Mathf.Max(0, Mathf.RoundToInt(value));
     }
@@ -57,6 +61,10 @@ public static class CombatStatCalculator
         float enhanceSpeedPercent = enhance != null ? enhance.GetSpeedPercent(item.Category) : 0f;
         if (enhanceSpeedPercent > 0f)
             value /= 1f + enhanceSpeedPercent / 100f;
+
+        float titleMagicPercent = TitleEnhanceProgress.CurrentMagicPercent;
+        if (titleMagicPercent > 0f)
+            value /= 1f + titleMagicPercent / 100f;
 
         return Mathf.Max(CombatBuffUtility.MinFireInterval, value);
     }

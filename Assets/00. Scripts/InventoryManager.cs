@@ -65,7 +65,6 @@ public class InventoryManager : MonoBehaviour
     private PreparePhaseMode preparePhaseMode;
     private int requiredExpansionCount;
     private readonly HashSet<Slot> selectedExpansionSlots = new();
-    private readonly HashSet<string> bannedShopKeys = new();
     private readonly HashSet<int> previewIndices = new();
     private readonly List<int> placementIndices = new();
     private readonly List<Vector2Int> shapeBuffer = new();
@@ -143,7 +142,7 @@ public class InventoryManager : MonoBehaviour
         ResolveOptimizeCountText();
         ResolveShopRerollCostText();
         ResolveGameManager();
-        remainingOptimizeCount = Mathf.Max(0, optimizeAvailableCount);
+        remainingOptimizeCount = Mathf.Max(0, optimizeAvailableCount + TitleEnhanceProgress.CurrentDiscardCount);
         UpdateOptimizeCountUI();
         UpdateShopRerollCostUI();
         UpdateModeActionButtons();
@@ -268,7 +267,7 @@ public class InventoryManager : MonoBehaviour
     {
         if (preparePhaseMode != PreparePhaseMode.ItemCompress) return;
         if (!HasOptimizationItems()) return;
-        ApplyClearBans();
+        ApplyClearSlots();
         remainingOptimizeCount = Mathf.Max(0, remainingOptimizeCount - 1);
         UpdateOptimizeCountUI();
         ExitSpecialPreparePhase();
@@ -704,7 +703,7 @@ public class InventoryManager : MonoBehaviour
         expansionCountText.text = $"확장 가능 칸 수 : {RemainingExpansionCount}";
     }
 
-    public void ApplyClearBans()
+    public void ApplyClearSlots()
     {
         if (clearSlots == null) return;
 
@@ -718,7 +717,6 @@ public class InventoryManager : MonoBehaviour
                 Item item = clearSlot.GetChild(childIndex).GetComponent<Item>();
                 if (item == null) continue;
 
-                bannedShopKeys.Add(item.ShopBanKey);
                 Destroy(item.gameObject);
             }
         }
@@ -801,7 +799,6 @@ public class InventoryManager : MonoBehaviour
             ItemPrefabSpawnEntry entry = itemPrefabs[i];
             if (entry == null || entry.prefab == null) continue;
             if (!entry.spawnEnabled) continue;
-            if (bannedShopKeys.Contains(entry.prefab.ShopBanKey)) continue;
             if (weaponOnly && !entry.prefab.IsWeapon) continue;
             allowed.Add(entry.prefab);
         }
@@ -853,13 +850,18 @@ public class InventoryManager : MonoBehaviour
 
     private float[] ResolveGradeChances()
     {
+        float[] baseChances;
         if (GameDataRepository.TryGetStageByOrder(shopStageOrder, out StageData stage) &&
             stage.ShopGradeWeights != null)
         {
-            return stage.ShopGradeWeights;
+            baseChances = stage.ShopGradeWeights;
+        }
+        else
+        {
+            baseChances = new[] { grade1Chance, grade2Chance, grade3Chance, grade4Chance, grade5Chance };
         }
 
-        return new[] { grade1Chance, grade2Chance, grade3Chance, grade4Chance, grade5Chance };
+        return TitleEnhanceProgress.ApplyProductivityToGradeWeights(baseChances);
     }
 
     private int RollGrade(int maxGrade)

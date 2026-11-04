@@ -4,14 +4,13 @@ using UnityEngine.UI;
 
 public class GameSpeedController : MonoBehaviour
 {
-    private const float SpeedNormal = 1f;
-    private const float SpeedFast = 2f;
+    private static readonly float[] SpeedSteps = { 1f, 2f, 3f };
 
     [SerializeField] private GameObject speedControlsRoot;
     [SerializeField] private Button speedButton;
     [SerializeField] private TextMeshProUGUI speedLabel;
 
-    private float desiredSpeed = SpeedNormal;
+    private float desiredSpeed = SpeedSteps[0];
     private bool simulationPaused;
     private bool overlayPaused;
 
@@ -54,7 +53,7 @@ public class GameSpeedController : MonoBehaviour
 
     public void SetDesiredSpeed(float speed)
     {
-        desiredSpeed = Mathf.Approximately(speed, SpeedFast) ? SpeedFast : SpeedNormal;
+        desiredSpeed = NormalizeSpeed(speed);
         RefreshLabel();
         ApplyTimeScale();
     }
@@ -112,12 +111,33 @@ public class GameSpeedController : MonoBehaviour
 
     private void ToggleSpeed()
     {
-        SetDesiredSpeed(Mathf.Approximately(desiredSpeed, SpeedFast) ? SpeedNormal : SpeedFast);
+        int index = IndexOfSpeed(desiredSpeed);
+        int next = (index + 1) % SpeedSteps.Length;
+        SetDesiredSpeed(SpeedSteps[next]);
     }
 
     private void RefreshLabel()
     {
-        if (speedLabel != null)
-            speedLabel.text = Mathf.Approximately(desiredSpeed, SpeedFast) ? "x2" : "x1";
+        if (speedLabel == null)
+            return;
+
+        speedLabel.text = $"x{Mathf.RoundToInt(desiredSpeed)}";
+    }
+
+    private static float NormalizeSpeed(float speed)
+    {
+        int index = IndexOfSpeed(speed);
+        return index >= 0 ? SpeedSteps[index] : SpeedSteps[0];
+    }
+
+    private static int IndexOfSpeed(float speed)
+    {
+        for (int i = 0; i < SpeedSteps.Length; i++)
+        {
+            if (Mathf.Approximately(speed, SpeedSteps[i]))
+                return i;
+        }
+
+        return -1;
     }
 }

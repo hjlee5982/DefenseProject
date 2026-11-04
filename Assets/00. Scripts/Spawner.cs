@@ -115,6 +115,9 @@ public class Spawner : MonoBehaviour
         Monster spawned = Instantiate(prefab, position, Quaternion.identity);
         if (entry != null)
             spawned.ApplyStageOverride(entry.Hp, entry.Atk, entry.Gold, entry.Exp);
+
+        // pendingStageOrder 0 = 1스테이지 표시. 스테이지%만큼 이동 속도 증가(100 = 2배).
+        spawned.ApplyStageMoveSpeedBonus(pendingStageOrder + 1);
         spawnedCount++;
         MonsterSpawned?.Invoke();
     }

@@ -139,7 +139,8 @@ public class CombatAudioPlayer : MonoBehaviour
 
         source.Stop();
         source.clip = clip;
-        source.volume = volume * masterVolume;
+        // 마스터는 AudioListener.volume, 여기선 SFX 채널만 반영한다.
+        source.volume = volume * masterVolume * GameAudioSettings.SfxVolume;
         source.pitch = 1f + UnityEngine.Random.Range(-pitchJitter, pitchJitter);
         source.Play();
 

@@ -69,8 +69,12 @@ public class Monster : MonoBehaviour
     public int DropExp => dropExp;
     public int ReservedDamage => reservedDamage;
     public int ExpectedRemainingHp => Mathf.Max(0, hp - reservedDamage);
-    public bool CanBeTargeted => !isDead && hp > 0 && ExpectedRemainingHp > 0;
+    public bool CanBeTargeted =>
+        !isDead && hp > 0 && ExpectedRemainingHp > 0 && HasCrossedMinLine;
     public bool IsDead => isDead;
+    /// <summary>FieldLayout/MinLine 아래로 내려온 뒤에만 공격 대상이 된다.</summary>
+    public bool HasCrossedMinLine =>
+        !TryGetMinLineWorldY(out float minLineY) || transform.position.y <= minLineY;
 
     private void Awake()
     {
@@ -217,7 +221,8 @@ public class Monster : MonoBehaviour
 
     public void ApplyConstantWindPull(Vector3 origin, float speed)
     {
-        if (isDead || isKnockback || isMovementStopped || speed <= 0f) return;
+        if (isDead || isKnockback || isMovementStopped || speed <= 0f || !HasCrossedMinLine)
+            return;
 
         suppressNormalMove = true;
 
@@ -238,6 +243,12 @@ public class Monster : MonoBehaviour
     private static float cachedBarrierTopY;
     private static int cachedBarrierFrame = -1;
 
+    private static RectTransform cachedMinLine;
+    private static Camera cachedWorldCamera;
+    private static float cachedMinLineWorldY;
+    private static int cachedMinLineFrame = -1;
+    private static bool cachedMinLineFound;
+
     private Vector3 ClampAgainstBarrier(Vector3 position)
     {
         if (!TryGetBarrierTopY(out float barrierTopY))
@@ -248,6 +259,39 @@ public class Monster : MonoBehaviour
             position.y = barrierTopY;
 
         return position;
+    }
+
+    private static bool TryGetMinLineWorldY(out float minLineWorldY)
+    {
+        if (cachedMinLineFrame != Time.frameCount)
+        {
+            cachedMinLineFrame = Time.frameCount;
+            cachedMinLineFound = false;
+            cachedMinLineWorldY = 0f;
+
+            if (cachedMinLine == null)
+            {
+                GameObject minLineObject = GameObject.Find("MinLine");
+                if (minLineObject != null)
+                    cachedMinLine = minLineObject.GetComponent<RectTransform>();
+            }
+
+            if (cachedWorldCamera == null)
+                cachedWorldCamera = Camera.main;
+
+            if (cachedMinLine != null && cachedWorldCamera != null)
+            {
+                Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(null, cachedMinLine.position);
+                float depth = Mathf.Abs(cachedWorldCamera.transform.position.z);
+                Vector3 worldPoint = cachedWorldCamera.ScreenToWorldPoint(
+                    new Vector3(screenPoint.x, screenPoint.y, depth));
+                cachedMinLineWorldY = worldPoint.y;
+                cachedMinLineFound = true;
+            }
+        }
+
+        minLineWorldY = cachedMinLineWorldY;
+        return cachedMinLineFound;
     }
 
     private bool TryGetBarrierTopY(out float barrierTopY)
@@ -744,6 +788,17 @@ public class Monster : MonoBehaviour
         if (stageAtk > 0) attackPower = stageAtk;
         if (stageGold >= 0) dropGold = stageGold;
         if (stageExp >= 0) dropExp = stageExp;
+    }
+
+    /// <summary>
+    /// 표시 스테이지 N 기준으로 이동 속도를 N% 증가시킨다. (100단계 = 2배)
+    /// </summary>
+    public void ApplyStageMoveSpeedBonus(int stageNumber)
+    {
+        if (stageNumber <= 0)
+            return;
+
+        moveSpeed *= 1f + stageNumber / 100f;
     }
 
     private void ApplyGameData()

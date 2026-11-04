@@ -14,6 +14,7 @@ public static class GameDataRepository
     private const string LevelCurveSheetName = "LevelCurve";
     private const string EnhanceOptionSheetName = "EnhanceOption";
     private const string EnhanceOptionEffectSheetName = "EnhanceOptionEffect";
+    private const string ReinforceSheetName = "Reinforce";
     private const string LocalizationSheetName = "Localization";
 
     private static readonly Dictionary<string, ItemData> ItemsByPrefabKey =
@@ -33,6 +34,9 @@ public static class GameDataRepository
     private static readonly List<EnhanceOptionData> EnhanceOptions = new();
     private static readonly Dictionary<string, List<EnhanceOptionEffectData>> EnhanceEffectsByOptionId =
         new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, ReinforceData> ReinforcesById =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly List<ReinforceData> ReinforceList = new();
     private static readonly Dictionary<string, Dictionary<string, string>> LocalizationByKey =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -44,6 +48,7 @@ public static class GameDataRepository
     public static IReadOnlyDictionary<string, ItemData> Items => ItemsByPrefabKey;
     public static IReadOnlyDictionary<string, MonsterData> Monsters => MonstersByPrefabKey;
     public static IReadOnlyList<EnhanceOptionData> AllEnhanceOptions => EnhanceOptions;
+    public static IReadOnlyList<ReinforceData> AllReinforces => ReinforceList;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Bootstrap()
@@ -64,6 +69,8 @@ public static class GameDataRepository
         maxCurveLevel = 0;
         EnhanceOptions.Clear();
         EnhanceEffectsByOptionId.Clear();
+        ReinforcesById.Clear();
+        ReinforceList.Clear();
         LocalizationByKey.Clear();
         loaded = false;
         loadError = null;
@@ -83,13 +90,15 @@ public static class GameDataRepository
         LoadLevelCurveSheet(path);
         LoadEnhanceOptionSheet(path);
         LoadEnhanceOptionEffectSheet(path);
+        LoadReinforceSheet(path);
         LoadLocalizationSheet(path);
 
         loaded = true;
         Debug.Log(
             $"[GameData] Loaded items={ItemsByPrefabKey.Count}, monsters={MonstersById.Count}, " +
             $"stages={StagesById.Count}, stageSpawns={StageSpawns.Count}, " +
-            $"enhanceOptions={EnhanceOptions.Count}, localization={LocalizationByKey.Count}");
+            $"enhanceOptions={EnhanceOptions.Count}, reinforces={ReinforceList.Count}, " +
+            $"localization={LocalizationByKey.Count}");
     }
 
     private static void LoadItemSheet(string path)
@@ -241,6 +250,24 @@ public static class GameDataRepository
         }
     }
 
+    private static void LoadReinforceSheet(string path)
+    {
+        if (!XlsxSheetReader.TryReadSheet(path, ReinforceSheetName, out List<Dictionary<string, string>> rows, out string error))
+        {
+            Debug.LogError($"[GameData] Reinforce sheet load failed: {error}");
+            return;
+        }
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (!TryParseReinforceRow(rows[i], out ReinforceData data))
+                continue;
+
+            ReinforcesById[data.Id] = data;
+            ReinforceList.Add(data);
+        }
+    }
+
     private static void LoadLocalizationSheet(string path)
     {
         if (!XlsxSheetReader.TryReadSheet(path, LocalizationSheetName, out List<Dictionary<string, string>> rows, out string error))
@@ -376,6 +403,16 @@ public static class GameDataRepository
             return new List<EnhanceOptionEffectData>();
 
         return new List<EnhanceOptionEffectData>(list);
+    }
+
+    public static bool TryGetReinforce(string id, out ReinforceData data)
+    {
+        EnsureLoaded();
+        data = null;
+        if (string.IsNullOrWhiteSpace(id))
+            return false;
+
+        return ReinforcesById.TryGetValue(id.Trim(), out data);
     }
 
     public static bool TryGetLocalization(string key, out string text, string preferredLang = "KR")
@@ -598,6 +635,49 @@ public static class GameDataRepository
             Value = CleanCell(Get(row, "Value"))
         };
         return true;
+    }
+
+    private static bool TryParseReinforceRow(Dictionary<string, string> row, out ReinforceData data)
+    {
+        data = null;
+
+        string id = CleanCell(Get(row, "ID", "Id"));
+        if (string.IsNullOrWhiteSpace(id))
+            return false;
+
+        int maxLevel = Mathf.Max(1, ParseInt(Get(row, "MaxLevel")));
+        int[] requires = ParseIntList(Get(row, "Require", "Requires"));
+        int[] values = ParseIntList(Get(row, "Value", "Values"));
+
+        data = new ReinforceData
+        {
+            Id = id,
+            Name = CleanCell(Get(row, "Name")),
+            MaxLevel = maxLevel,
+            Requires = requires,
+            Values = values
+        };
+        return true;
+    }
+
+    private static int[] ParseIntList(string text)
+    {
+        string cleaned = CleanCell(text);
+        if (string.IsNullOrWhiteSpace(cleaned))
+            return Array.Empty<int>();
+
+        string[] parts = cleaned.Split(new[] { ',', '/', ';' }, StringSplitOptions.RemoveEmptyEntries);
+        List<int> values = new(parts.Length);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string part = parts[i].Trim();
+            if (string.IsNullOrWhiteSpace(part))
+                continue;
+
+            values.Add(ParseInt(part));
+        }
+
+        return values.ToArray();
     }
 
     private static string Get(Dictionary<string, string> row, params string[] keys)

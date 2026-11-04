@@ -21,6 +21,8 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 
     [SerializeField] private float rotateDuration = 0.15f;
     [SerializeField] private float cellSize = 100f;
+    [Tooltip("터치로 드래그할 때 아이템을 손가락 위쪽으로 띄우는 거리(화면 높이 대비 비율). 0이면 사용 안 함.")]
+    [SerializeField, Range(0f, 0.3f)] private float touchDragLiftRatio = 0.1f;
     [SerializeField] private ItemCategory category = ItemCategory.Fire;
     [SerializeField] private int grade = 1;
     [SerializeField] private Color[] gradeColors =
@@ -45,6 +47,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     private Vector2 dragGrabOffsetLocal;
     private Vector2 lastScreenPosition;
     private Camera lastPressCamera;
+    private Vector2 dragScreenLift;
     private Tween rotateTween;
     private float angleZ;
     private float targetAngleZ;
@@ -169,6 +172,9 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     public void OnBeginDrag(PointerEventData eventData)
     {
         isDragging = true;
+        dragScreenLift = IsTouchPointer(eventData)
+            ? new Vector2(0f, Screen.height * touchDragLiftRatio)
+            : Vector2.zero;
         if (inventoryManager != null)
             inventoryManager.NotifyItemDragBegan(this);
 
@@ -214,7 +220,9 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         angleZ = targetAngleZ;
         SetAngleZ(angleZ);
 
-        if (inventoryManager.TryMergeItems(this, eventData.position, eventData.pressEventCamera))
+        // 터치일 때는 화면에 보이는(손가락보다 위로 띄운) 위치를 기준으로 놓는다.
+        Vector2 dropPosition = eventData.position + dragScreenLift;
+        if (inventoryManager.TryMergeItems(this, dropPosition, eventData.pressEventCamera))
         {
             inventoryManager.ClearPreview();
             inventoryManager.NotifyItemDragEnded(this);
@@ -225,15 +233,15 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         if (inventoryManager.IsClearPrepareMode)
         {
             placed =
-                inventoryManager.TryPlaceItemOnClear(this, eventData.position, eventData.pressEventCamera, dragStartParent) ||
-                inventoryManager.TryPlaceItemOnShop(this, eventData.position, eventData.pressEventCamera);
+                inventoryManager.TryPlaceItemOnClear(this, dropPosition, eventData.pressEventCamera, dragStartParent) ||
+                inventoryManager.TryPlaceItemOnShop(this, dropPosition, eventData.pressEventCamera);
         }
         else
         {
             placed =
-                inventoryManager.TryPlaceItem(this, eventData.position, eventData.pressEventCamera) ||
-                inventoryManager.TryPlaceItemOnShop(this, eventData.position, eventData.pressEventCamera) ||
-                inventoryManager.TryPlaceItemOnClear(this, eventData.position, eventData.pressEventCamera, dragStartParent);
+                inventoryManager.TryPlaceItem(this, dropPosition, eventData.pressEventCamera) ||
+                inventoryManager.TryPlaceItemOnShop(this, dropPosition, eventData.pressEventCamera) ||
+                inventoryManager.TryPlaceItemOnClear(this, dropPosition, eventData.pressEventCamera, dragStartParent);
         }
 
         inventoryManager.ClearPreview();
@@ -502,7 +510,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     {
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
                 parentRect,
-                eventData.position,
+                eventData.position + dragScreenLift,
                 eventData.pressEventCamera,
                 out Vector2 localPoint))
         {
@@ -562,9 +570,17 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         return RectTransformUtility.WorldToScreenPoint(eventCamera, pivot.position);
     }
 
+    private static bool IsTouchPointer(PointerEventData eventData)
+    {
+        if (eventData is UnityEngine.InputSystem.UI.ExtendedPointerEventData extended)
+            return extended.pointerType == UnityEngine.InputSystem.UI.UIPointerType.Touch;
+
+        return eventData.pointerId >= 0;
+    }
+
     private void UpdatePreview(PointerEventData eventData)
     {
-        lastScreenPosition = eventData.position;
+        lastScreenPosition = eventData.position + dragScreenLift;
         lastPressCamera = eventData.pressEventCamera;
         inventoryManager.UpdateItemPreview(this, lastScreenPosition, lastPressCamera);
     }
