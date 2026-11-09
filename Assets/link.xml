@@ -1,0 +1,5 @@
+<linker>
+  <!-- Used by XlsxSheetReader at runtime on IL2CPP player builds. -->
+  <assembly fullname="System.Xml.Linq" preserve="all" />
+  <assembly fullname="System.IO.Compression" preserve="all" />
+</linker>

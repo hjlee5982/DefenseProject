@@ -20,8 +20,6 @@ public class Projectile : MonoBehaviour
     private const float FireAdditionalSideAngleDegrees = 25f;
     private const float WindPullSpeed = 1f;
     private const float WindPullRadius = 3f;
-    private const float WaterKnockbackDistance = 0.625f;
-    private const float WaterKnockbackDuration = 0.15f;
     private const float RockRootDuration = 0.75f;
     private const int GrimoireMultiHitCount = 15;
     private const float GrimoireMultiHitStep = 0.5f;
@@ -58,7 +56,6 @@ public class Projectile : MonoBehaviour
     private bool spawnAdditionalOnHit;
     private Item.ItemCategory sourceCategory;
     private int sourceItemGrade;
-    private float activeWaterKnockbackDistance = WaterKnockbackDistance;
     private float activeRockRootDuration = RockRootDuration;
     private float activeWindPullSpeed = WindPullSpeed;
     private bool freeFlight;
@@ -232,11 +229,10 @@ public class Projectile : MonoBehaviour
         return true;
     }
 
-    public bool InitWaterAdditional(Monster hitMonster, float knockbackDistance = -1f)
+    public bool InitWaterAdditional(Monster hitMonster)
     {
         if (hitMonster == null || hitMonster.IsDead) return false;
 
-        activeWaterKnockbackDistance = knockbackDistance > 0f ? knockbackDistance : WaterKnockbackDistance;
         target = hitMonster;
         freeFlight = false;
         instantLinger = true;
@@ -254,9 +250,6 @@ public class Projectile : MonoBehaviour
             PlayHitSound();
         }
 
-        if (!hitMonster.IsDead)
-            hitMonster.ApplyKnockback(Vector3.up, activeWaterKnockbackDistance, WaterKnockbackDuration);
-
         SpawnInstantLingerEffect();
         StartCoroutine(FinishAfterEffectAnimation());
         return true;
@@ -264,7 +257,8 @@ public class Projectile : MonoBehaviour
 
     public bool InitRockAdditional(float rootDuration = -1f)
     {
-        activeRockRootDuration = rootDuration > 0f ? rootDuration : RockRootDuration;
+        // rootDuration < 0: default. 0: no root. > 0: custom duration.
+        activeRockRootDuration = rootDuration < 0f ? RockRootDuration : rootDuration;
         target = null;
         freeFlight = false;
         instantLinger = true;
@@ -835,8 +829,7 @@ public class Projectile : MonoBehaviour
     {
         Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
         ConfigureSpawnedAdditional(additional);
-        float knockback = HasEnhancedAdditional ? WaterKnockbackDistance * 2f : WaterKnockbackDistance;
-        if (!additional.InitWaterAdditional(hitMonster, knockback))
+        if (!additional.InitWaterAdditional(hitMonster))
             Destroy(additional.gameObject);
     }
 
@@ -844,7 +837,8 @@ public class Projectile : MonoBehaviour
     {
         Projectile additional = Instantiate(additionalProjectilePrefab, hitPosition, Quaternion.identity);
         ConfigureSpawnedAdditional(additional);
-        float rootDuration = HasEnhancedAdditional ? RockRootDuration * 2f : RockRootDuration;
+        // 4등급: 추가 공격만. 5등급: 기존 4등급과 동일한 경직.
+        float rootDuration = HasEnhancedAdditional ? RockRootDuration : 0f;
         if (!additional.InitRockAdditional(rootDuration))
             Destroy(additional.gameObject);
     }

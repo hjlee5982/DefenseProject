@@ -210,7 +210,6 @@ public class GameManager : MonoBehaviour
 
         clearedStageCount++;
         displayedRound = clearedStageCount + 1;
-        inventoryManager.SetShopStageOrder(clearedStageCount);
         PreparePhaseMode prepareMode = ResolvePreparePhaseMode(clearedStageCount);
         isInitialExpansionPhase = false;
         int expansionUnlockCount = GetExpansionUnlockCount();
@@ -227,7 +226,6 @@ public class GameManager : MonoBehaviour
 
     private void EnterInitialPreparePhase()
     {
-        inventoryManager.SetShopStageOrder(clearedStageCount);
         PreparePhaseMode prepareMode = inventoryManager.CanExpandBag
             ? PreparePhaseMode.BagExpansion
             : PreparePhaseMode.Normal;

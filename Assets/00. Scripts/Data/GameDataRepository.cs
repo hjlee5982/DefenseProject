@@ -75,23 +75,26 @@ public static class GameDataRepository
         loaded = false;
         loadError = null;
 
-        string path = ResolveXlsxPath();
-        if (string.IsNullOrEmpty(path))
+        if (!TryLoadWorkbookBytes(out byte[] workbookBytes, out string sourceLabel))
         {
-            loadError = $"xlsx not found. Tried '{DefaultRelativePath}' under Assets/StreamingAssets.";
+            loadError =
+                "xlsx not found. Tried Resources/GameData.bytes, " +
+                $"'{DefaultRelativePath}', and StreamingAssets/GameData.xlsx.";
             Debug.LogError($"[GameData] load failed: {loadError}");
             return;
         }
 
-        LoadItemSheet(path);
-        LoadMonsterSheet(path);
-        LoadStageSheet(path);
-        LoadStageSpawnSheet(path);
-        LoadLevelCurveSheet(path);
-        LoadEnhanceOptionSheet(path);
-        LoadEnhanceOptionEffectSheet(path);
-        LoadReinforceSheet(path);
-        LoadLocalizationSheet(path);
+        Debug.Log($"[GameData] Reading workbook from {sourceLabel} ({workbookBytes.Length} bytes)");
+
+        LoadItemSheet(workbookBytes);
+        LoadMonsterSheet(workbookBytes);
+        LoadStageSheet(workbookBytes);
+        LoadStageSpawnSheet(workbookBytes);
+        LoadLevelCurveSheet(workbookBytes);
+        LoadEnhanceOptionSheet(workbookBytes);
+        LoadEnhanceOptionEffectSheet(workbookBytes);
+        LoadReinforceSheet(workbookBytes);
+        LoadLocalizationSheet(workbookBytes);
 
         loaded = true;
         Debug.Log(
@@ -101,9 +104,9 @@ public static class GameDataRepository
             $"localization={LocalizationByKey.Count}");
     }
 
-    private static void LoadItemSheet(string path)
+    private static void LoadItemSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, ItemSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, ItemSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogError($"[GameData] Item sheet load failed: {error}");
             return;
@@ -122,9 +125,9 @@ public static class GameDataRepository
         }
     }
 
-    private static void LoadMonsterSheet(string path)
+    private static void LoadMonsterSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, MonsterSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, MonsterSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogError($"[GameData] Monster sheet load failed: {error}");
             return;
@@ -143,9 +146,9 @@ public static class GameDataRepository
         }
     }
 
-    private static void LoadStageSheet(string path)
+    private static void LoadStageSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, StageSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, StageSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogError($"[GameData] Stage sheet load failed: {error}");
             return;
@@ -161,9 +164,9 @@ public static class GameDataRepository
         }
     }
 
-    private static void LoadStageSpawnSheet(string path)
+    private static void LoadStageSpawnSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, StageSpawnSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, StageSpawnSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogError($"[GameData] StageSpawn sheet load failed: {error}");
             return;
@@ -178,9 +181,9 @@ public static class GameDataRepository
         }
     }
 
-    private static void LoadLevelCurveSheet(string path)
+    private static void LoadLevelCurveSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, LevelCurveSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, LevelCurveSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogWarning($"[GameData] LevelCurve sheet load failed: {error}");
             return;
@@ -210,9 +213,9 @@ public static class GameDataRepository
         return ExpToNextByLevel.TryGetValue(level, out expToNext);
     }
 
-    private static void LoadEnhanceOptionSheet(string path)
+    private static void LoadEnhanceOptionSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, EnhanceOptionSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, EnhanceOptionSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogError($"[GameData] EnhanceOption sheet load failed: {error}");
             return;
@@ -227,9 +230,9 @@ public static class GameDataRepository
         }
     }
 
-    private static void LoadEnhanceOptionEffectSheet(string path)
+    private static void LoadEnhanceOptionEffectSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, EnhanceOptionEffectSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, EnhanceOptionEffectSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogError($"[GameData] EnhanceOptionEffect sheet load failed: {error}");
             return;
@@ -250,9 +253,9 @@ public static class GameDataRepository
         }
     }
 
-    private static void LoadReinforceSheet(string path)
+    private static void LoadReinforceSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, ReinforceSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, ReinforceSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogError($"[GameData] Reinforce sheet load failed: {error}");
             return;
@@ -268,9 +271,9 @@ public static class GameDataRepository
         }
     }
 
-    private static void LoadLocalizationSheet(string path)
+    private static void LoadLocalizationSheet(byte[] workbookBytes)
     {
-        if (!XlsxSheetReader.TryReadSheet(path, LocalizationSheetName, out List<Dictionary<string, string>> rows, out string error))
+        if (!XlsxSheetReader.TryReadSheet(workbookBytes, LocalizationSheetName, out List<Dictionary<string, string>> rows, out string error))
         {
             Debug.LogError($"[GameData] Localization sheet load failed: {error}");
             return;
@@ -298,17 +301,37 @@ public static class GameDataRepository
         langs[lang] = cleaned;
     }
 
-    private static string ResolveXlsxPath()
+    private static bool TryLoadWorkbookBytes(out byte[] workbookBytes, out string sourceLabel)
     {
+        // Android/iOS cannot File.Open StreamingAssets (jar/apk). Prefer Resources.
+        TextAsset embedded = Resources.Load<TextAsset>("GameData");
+        if (embedded != null && embedded.bytes != null && embedded.bytes.Length > 0)
+        {
+            workbookBytes = embedded.bytes;
+            sourceLabel = "Resources/GameData";
+            return true;
+        }
+
         string assetsPath = Path.Combine(Application.dataPath, DefaultRelativePath);
         if (File.Exists(assetsPath))
-            return assetsPath;
+        {
+            workbookBytes = File.ReadAllBytes(assetsPath);
+            sourceLabel = assetsPath;
+            return true;
+        }
 
+        // Standalone / Editor only. On Android streamingAssetsPath is jar:file://...
         string streamingPath = Path.Combine(Application.streamingAssetsPath, "GameData.xlsx");
-        if (File.Exists(streamingPath))
-            return streamingPath;
+        if (!streamingPath.Contains("://") && File.Exists(streamingPath))
+        {
+            workbookBytes = File.ReadAllBytes(streamingPath);
+            sourceLabel = streamingPath;
+            return true;
+        }
 
-        return null;
+        workbookBytes = null;
+        sourceLabel = null;
+        return false;
     }
 
     public static bool TryGetItemByPrefabKey(string prefabKey, out ItemData itemData)

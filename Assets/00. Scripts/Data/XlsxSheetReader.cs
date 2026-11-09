@@ -31,99 +31,8 @@ public static class XlsxSheetReader
 
         try
         {
-            using ZipArchive archive = OpenArchiveShared(xlsxPath);
-            List<string> sharedStrings = ReadSharedStrings(archive);
-            if (!TryResolveSheetPath(archive, sheetName, out string sheetPath, out error))
-                return false;
-
-            ZipArchiveEntry sheetEntry = archive.GetEntry(sheetPath);
-            if (sheetEntry == null)
-            {
-                error = $"sheet entry missing: {sheetPath}";
-                return false;
-            }
-
-            XDocument sheetDoc;
-            using (Stream stream = sheetEntry.Open())
-                sheetDoc = XDocument.Load(stream);
-
-            Dictionary<int, Dictionary<int, string>> grid = new();
-            int maxCol = -1;
-            int maxRow = -1;
-
-            XElement sheetData = sheetDoc.Root?.Element(MainNs + "sheetData");
-            if (sheetData == null)
-            {
-                rows = new List<Dictionary<string, string>>();
-                return true;
-            }
-
-            foreach (XElement rowElement in sheetData.Elements(MainNs + "row"))
-            {
-                foreach (XElement cellElement in rowElement.Elements(MainNs + "c"))
-                {
-                    string cellRef = (string)cellElement.Attribute("r");
-                    if (string.IsNullOrEmpty(cellRef) || !TryParseCellRef(cellRef, out int col, out int row))
-                        continue;
-
-                    string value = ReadCellValue(cellElement, sharedStrings);
-                    if (!grid.TryGetValue(row, out Dictionary<int, string> rowMap))
-                    {
-                        rowMap = new Dictionary<int, string>();
-                        grid[row] = rowMap;
-                    }
-
-                    rowMap[col] = value;
-                    maxCol = Math.Max(maxCol, col);
-                    maxRow = Math.Max(maxRow, row);
-                }
-            }
-
-            if (maxRow < 0 || maxCol < 0)
-            {
-                rows = new List<Dictionary<string, string>>();
-                return true;
-            }
-
-            if (!grid.TryGetValue(0, out Dictionary<int, string> headerRow))
-            {
-                error = $"sheet '{sheetName}' has no header row";
-                return false;
-            }
-
-            string[] headers = new string[maxCol + 1];
-            for (int col = 0; col <= maxCol; col++)
-            {
-                headers[col] = headerRow.TryGetValue(col, out string header)
-                    ? header.Trim()
-                    : string.Empty;
-            }
-
-            rows = new List<Dictionary<string, string>>();
-            for (int row = 1; row <= maxRow; row++)
-            {
-                if (!grid.TryGetValue(row, out Dictionary<int, string> values))
-                    continue;
-
-                Dictionary<string, string> mapped = new(StringComparer.OrdinalIgnoreCase);
-                bool anyValue = false;
-                for (int col = 0; col <= maxCol; col++)
-                {
-                    string header = headers[col];
-                    if (string.IsNullOrEmpty(header)) continue;
-
-                    string cellValue = values.TryGetValue(col, out string raw) ? raw : string.Empty;
-                    if (!string.IsNullOrWhiteSpace(cellValue))
-                        anyValue = true;
-
-                    mapped[header] = cellValue;
-                }
-
-                if (anyValue)
-                    rows.Add(mapped);
-            }
-
-            return true;
+            using ZipArchive archive = OpenArchiveFromPath(xlsxPath);
+            return TryReadSheet(archive, sheetName, out rows, out error);
         }
         catch (Exception exception)
         {
@@ -133,7 +42,138 @@ public static class XlsxSheetReader
         }
     }
 
-    private static ZipArchive OpenArchiveShared(string xlsxPath)
+    public static bool TryReadSheet(
+        byte[] xlsxBytes,
+        string sheetName,
+        out List<Dictionary<string, string>> rows,
+        out string error)
+    {
+        rows = null;
+        error = null;
+
+        if (xlsxBytes == null || xlsxBytes.Length == 0)
+        {
+            error = "xlsx bytes are empty";
+            return false;
+        }
+
+        try
+        {
+            using ZipArchive archive = OpenArchiveFromBytes(xlsxBytes);
+            return TryReadSheet(archive, sheetName, out rows, out error);
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            rows = null;
+            return false;
+        }
+    }
+
+    private static bool TryReadSheet(
+        ZipArchive archive,
+        string sheetName,
+        out List<Dictionary<string, string>> rows,
+        out string error)
+    {
+        rows = null;
+        error = null;
+
+        List<string> sharedStrings = ReadSharedStrings(archive);
+        if (!TryResolveSheetPath(archive, sheetName, out string sheetPath, out error))
+            return false;
+
+        ZipArchiveEntry sheetEntry = archive.GetEntry(sheetPath);
+        if (sheetEntry == null)
+        {
+            error = $"sheet entry missing: {sheetPath}";
+            return false;
+        }
+
+        XDocument sheetDoc;
+        using (Stream stream = sheetEntry.Open())
+            sheetDoc = XDocument.Load(stream);
+
+        Dictionary<int, Dictionary<int, string>> grid = new();
+        int maxCol = -1;
+        int maxRow = -1;
+
+        XElement sheetData = sheetDoc.Root?.Element(MainNs + "sheetData");
+        if (sheetData == null)
+        {
+            rows = new List<Dictionary<string, string>>();
+            return true;
+        }
+
+        foreach (XElement rowElement in sheetData.Elements(MainNs + "row"))
+        {
+            foreach (XElement cellElement in rowElement.Elements(MainNs + "c"))
+            {
+                string cellRef = (string)cellElement.Attribute("r");
+                if (string.IsNullOrEmpty(cellRef) || !TryParseCellRef(cellRef, out int col, out int row))
+                    continue;
+
+                string value = ReadCellValue(cellElement, sharedStrings);
+                if (!grid.TryGetValue(row, out Dictionary<int, string> rowMap))
+                {
+                    rowMap = new Dictionary<int, string>();
+                    grid[row] = rowMap;
+                }
+
+                rowMap[col] = value;
+                maxCol = Math.Max(maxCol, col);
+                maxRow = Math.Max(maxRow, row);
+            }
+        }
+
+        if (maxRow < 0 || maxCol < 0)
+        {
+            rows = new List<Dictionary<string, string>>();
+            return true;
+        }
+
+        if (!grid.TryGetValue(0, out Dictionary<int, string> headerRow))
+        {
+            error = $"sheet '{sheetName}' has no header row";
+            return false;
+        }
+
+        string[] headers = new string[maxCol + 1];
+        for (int col = 0; col <= maxCol; col++)
+        {
+            headers[col] = headerRow.TryGetValue(col, out string header)
+                ? header.Trim()
+                : string.Empty;
+        }
+
+        rows = new List<Dictionary<string, string>>();
+        for (int row = 1; row <= maxRow; row++)
+        {
+            if (!grid.TryGetValue(row, out Dictionary<int, string> values))
+                continue;
+
+            Dictionary<string, string> mapped = new(StringComparer.OrdinalIgnoreCase);
+            bool anyValue = false;
+            for (int col = 0; col <= maxCol; col++)
+            {
+                string header = headers[col];
+                if (string.IsNullOrEmpty(header)) continue;
+
+                string cellValue = values.TryGetValue(col, out string raw) ? raw : string.Empty;
+                if (!string.IsNullOrWhiteSpace(cellValue))
+                    anyValue = true;
+
+                mapped[header] = cellValue;
+            }
+
+            if (anyValue)
+                rows.Add(mapped);
+        }
+
+        return true;
+    }
+
+    private static ZipArchive OpenArchiveFromPath(string xlsxPath)
     {
         // Excel may keep the workbook locked while editing; copy under shared read.
         using FileStream fileStream = new(
@@ -145,6 +185,12 @@ public static class XlsxSheetReader
         MemoryStream memoryStream = new();
         fileStream.CopyTo(memoryStream);
         memoryStream.Position = 0;
+        return new ZipArchive(memoryStream, ZipArchiveMode.Read, leaveOpen: false);
+    }
+
+    private static ZipArchive OpenArchiveFromBytes(byte[] xlsxBytes)
+    {
+        MemoryStream memoryStream = new(xlsxBytes, writable: false);
         return new ZipArchive(memoryStream, ZipArchiveMode.Read, leaveOpen: false);
     }
 

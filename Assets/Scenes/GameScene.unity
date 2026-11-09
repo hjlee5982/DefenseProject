@@ -4155,7 +4155,7 @@ MonoBehaviour:
   clearPanel: {fileID: 2124048180}
   expansionPanel: {fileID: 958130431}
   expansionCountText: {fileID: 671443101}
-  optimizeAvailableCount: 0
+  optimizeAvailableCount: 3
   optimizeCountText: {fileID: 68917040}
   shopRerollCost: 300
   shopRerollCostText: {fileID: 1767139667}

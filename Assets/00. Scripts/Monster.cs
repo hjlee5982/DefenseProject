@@ -51,9 +51,7 @@ public class Monster : MonoBehaviour
     private float displayedHpRatio = 1f;
     private Tween hpGaugeTween;
     private Tween hitFlashTween;
-    private Tween knockbackTween;
     private bool suppressNormalMove;
-    private bool isKnockback;
     private bool isMovementStopped;
     private Coroutine temporaryStopRoutine;
     private float animatorSpeedBeforeStop = 1f;
@@ -111,7 +109,6 @@ public class Monster : MonoBehaviour
     {
         KillHpGaugeTween();
         KillHitFlashTween(restoreMaterial: false);
-        KillKnockbackTween();
         if (temporaryStopRoutine != null)
         {
             StopCoroutine(temporaryStopRoutine);
@@ -138,9 +135,6 @@ public class Monster : MonoBehaviour
     private void Update()
     {
         if (isDead) return;
-
-        if (isKnockback)
-            return;
 
         if (isMovementStopped)
             return;
@@ -221,7 +215,7 @@ public class Monster : MonoBehaviour
 
     public void ApplyConstantWindPull(Vector3 origin, float speed)
     {
-        if (isDead || isKnockback || isMovementStopped || speed <= 0f || !HasCrossedMinLine)
+        if (isDead || isMovementStopped || speed <= 0f || !HasCrossedMinLine)
             return;
 
         suppressNormalMove = true;
@@ -331,40 +325,6 @@ public class Monster : MonoBehaviour
 
         barrierTopY = cachedBarrierTopY;
         return true;
-    }
-
-    public void ApplyKnockback(Vector3 direction, float distance, float duration = 0.15f)
-    {
-        if (isDead || distance <= 0f) return;
-        if (direction.sqrMagnitude <= 0.0001f) return;
-
-        KillKnockbackTween();
-        isKnockback = true;
-
-        Vector3 targetPosition = transform.position + direction.normalized * distance;
-        knockbackTween = transform.DOMove(targetPosition, Mathf.Max(0.01f, duration))
-            .SetEase(Ease.OutQuad)
-            .SetUpdate(true)
-            .SetLink(gameObject)
-            .OnComplete(() =>
-            {
-                isKnockback = false;
-                knockbackTween = null;
-                ValidateBarrierAttackRange();
-            })
-            .OnKill(() =>
-            {
-                isKnockback = false;
-                knockbackTween = null;
-            });
-    }
-
-    private void KillKnockbackTween()
-    {
-        if (knockbackTween == null) return;
-        knockbackTween.Kill();
-        knockbackTween = null;
-        isKnockback = false;
     }
 
     public bool TryReserve(MonoBehaviour source, int amount)
