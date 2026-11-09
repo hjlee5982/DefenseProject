@@ -1,40 +1,31 @@
 fileFormatVersion: 2
-guid: edd7a3fe13484c546b922524d7f411a6
+guid: 1f80e1dcd1bd71846bbfd431aed57c30
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5524012555753198225
-    second: bat_animations_0
+      213: 2104901783972924173
+    second: Crab_0
   - first:
-      213: -2387602798807829900
-    second: bat_animations_1
+      213: -2737054537425604709
+    second: Crab_1
   - first:
-      213: 8715297022941849105
-    second: bat_animations_2
+      213: 5341608183224508309
+    second: Crab_2
   - first:
-      213: 5022352050322670775
-    second: bat_animations_3
+      213: 8921867162773266863
+    second: Crab_3
   - first:
-      213: 4892273852717063188
-    second: bat_animations_4
+      213: -7278780791788454882
+    second: Crab_4
   - first:
-      213: -7539042835425594585
-    second: bat_animations_5
+      213: -7057093182316294559
+    second: Crab_5
   - first:
-      213: 3323675202266561623
-    second: bat_animations_6
+      213: -486509110086767270
+    second: Crab_6
   - first:
-      213: 6951625532887663612
-    second: bat_animations_7
-  - first:
-      213: 149712967146331011
-    second: bat_animations_8
-  - first:
-      213: -8517885243886581231
-    second: bat_animations_9
-  - first:
-      213: -4252161650492481797
-    second: bat_animations_10
+      213: -6577167406303223293
+    second: Crab_7
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -81,7 +72,7 @@ TextureImporter:
   spriteMeshType: 1
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 100
+  spritePixelsToUnits: 32
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
@@ -143,13 +134,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: bat_animations_0
+      name: Crab_0
       rect:
         serializedVersion: 2
         x: 0
-        y: 32
-        width: 32
-        height: 32
+        y: 20
+        width: 20
+        height: 20
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -158,20 +149,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f6d688719d3c653b0800000000000000
-      internalID: -5524012555753198225
+      spriteID: d0bcac0350d163d10800000000000000
+      internalID: 2104901783972924173
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: bat_animations_1
+      name: Crab_1
       rect:
         serializedVersion: 2
-        x: 32
-        y: 32
-        width: 32
-        height: 32
+        x: 20
+        y: 20
+        width: 20
+        height: 20
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -180,20 +171,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 472b45097e78dded0800000000000000
-      internalID: -2387602798807829900
+      spriteID: b9f20e55667040ad0800000000000000
+      internalID: -2737054537425604709
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: bat_animations_2
+      name: Crab_2
       rect:
         serializedVersion: 2
-        x: 64
-        y: 32
-        width: 32
-        height: 32
+        x: 40
+        y: 20
+        width: 20
+        height: 20
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -202,20 +193,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 116e77c7774f2f870800000000000000
-      internalID: 8715297022941849105
+      spriteID: 59f9a627754312a40800000000000000
+      internalID: 5341608183224508309
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: bat_animations_3
+      name: Crab_3
       rect:
         serializedVersion: 2
-        x: 96
-        y: 32
-        width: 32
-        height: 32
+        x: 60
+        y: 20
+        width: 20
+        height: 20
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -224,42 +215,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 7b40078849af2b540800000000000000
-      internalID: 5022352050322670775
+      spriteID: fa1a25a1ae6d0db70800000000000000
+      internalID: 8921867162773266863
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: bat_animations_4
-      rect:
-        serializedVersion: 2
-        x: 128
-        y: 32
-        width: 32
-        height: 32
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 41cd12f0629d4e340800000000000000
-      internalID: 4892273852717063188
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: bat_animations_5
+      name: Crab_4
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 32
-        height: 32
+        width: 20
+        height: 20
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -268,20 +237,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 723f0081c70ff5790800000000000000
-      internalID: -7539042835425594585
+      spriteID: e1c338b3f639cfa90800000000000000
+      internalID: -7278780791788454882
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: bat_animations_6
+      name: Crab_5
       rect:
         serializedVersion: 2
-        x: 32
+        x: 20
         y: 0
-        width: 32
-        height: 32
+        width: 20
+        height: 20
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -290,20 +259,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 75c7fd3acf0102e20800000000000000
-      internalID: 3323675202266561623
+      spriteID: 16ec439042b201e90800000000000000
+      internalID: -7057093182316294559
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: bat_animations_7
+      name: Crab_6
       rect:
         serializedVersion: 2
-        x: 64
+        x: 40
         y: 0
-        width: 32
-        height: 32
+        width: 20
+        height: 20
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -312,20 +281,20 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: cf30e434792297060800000000000000
-      internalID: 6951625532887663612
+      spriteID: a5d6941ca829f39f0800000000000000
+      internalID: -486509110086767270
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: bat_animations_8
+      name: Crab_7
       rect:
         serializedVersion: 2
-        x: 96
+        x: 60
         y: 0
-        width: 32
-        height: 32
+        width: 20
+        height: 20
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -334,52 +303,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 38bd6018623e31200800000000000000
-      internalID: 149712967146331011
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: bat_animations_9
-      rect:
-        serializedVersion: 2
-        x: 128
-        y: 0
-        width: 32
-        height: 32
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 11a499810846ac980800000000000000
-      internalID: -8517885243886581231
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: bat_animations_10
-      rect:
-        serializedVersion: 2
-        x: 160
-        y: 0
-        width: 32
-        height: 32
-      alignment: 0
-      pivot: {x: 0.5, y: 0.5}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: bfe5bdef1894df4c0800000000000000
-      internalID: -4252161650492481797
+      spriteID: 302e40f571539b4a0800000000000000
+      internalID: -6577167406303223293
       vertices: []
       indices: 
       edges: []
@@ -388,7 +313,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: ffebfa248c617ef41a6c2e0943732f77
+    spriteID: 16fe4b584d48331489a059e9bf41e39f
     internalID: 0
     vertices: []
     indices: 
@@ -398,19 +323,16 @@ TextureImporter:
     spriteCustomMetadata:
       entries:
       - key: SpriteEditor.SliceSettings
-        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":32.0,"y":32.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":1,"keepEmptyRects":false,"isAlternate":false}'
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":20.0,"y":20.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":1,"keepEmptyRects":false,"isAlternate":false}'
     nameFileIdTable:
-      bat_animations_0: -5524012555753198225
-      bat_animations_1: -2387602798807829900
-      bat_animations_10: -4252161650492481797
-      bat_animations_2: 8715297022941849105
-      bat_animations_3: 5022352050322670775
-      bat_animations_4: 4892273852717063188
-      bat_animations_5: -7539042835425594585
-      bat_animations_6: 3323675202266561623
-      bat_animations_7: 6951625532887663612
-      bat_animations_8: 149712967146331011
-      bat_animations_9: -8517885243886581231
+      Crab_0: 2104901783972924173
+      Crab_1: -2737054537425604709
+      Crab_2: 5341608183224508309
+      Crab_3: 8921867162773266863
+      Crab_4: -7278780791788454882
+      Crab_5: -7057093182316294559
+      Crab_6: -486509110086767270
+      Crab_7: -6577167406303223293
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
