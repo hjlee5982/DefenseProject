@@ -32,7 +32,7 @@ public class InstantAttack : MonoBehaviour
         if (target == null || amount <= 0) return false;
         if (!target.TryReserve(this, amount)) return false;
 
-        Vector3 hitPosition = target.transform.position;
+        Vector3 hitPosition = target.AimPosition;
         if (showGuideline)
             AttackGuideline.Show(guidelinePrefab, origin, hitPosition, guidelineRotationOffset);
 

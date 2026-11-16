@@ -27,6 +27,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private PlayerShooter playerShooter;
     [SerializeField] private RoundEventScheduler roundEventScheduler;
     [SerializeField] private Barrier barrier;
+    [Tooltip("스테이지에 따라 아침/오후/밤 분위기로 Global Light 2D를 바꾼다. 비어 있으면 씬에서 찾는다.")]
+    [SerializeField] private StageAmbientLight stageAmbientLight;
     [Header("Result")]
     [SerializeField] private GameObject resultPanel;
     [SerializeField] private TextMeshProUGUI resultStageText;
@@ -210,6 +212,7 @@ public class GameManager : MonoBehaviour
 
         clearedStageCount++;
         displayedRound = clearedStageCount + 1;
+        ApplyStageAmbient();
         PreparePhaseMode prepareMode = ResolvePreparePhaseMode(clearedStageCount);
         isInitialExpansionPhase = false;
         int expansionUnlockCount = GetExpansionUnlockCount();
@@ -241,6 +244,7 @@ public class GameManager : MonoBehaviour
         }
 
         displayedRound = clearedStageCount + 1;
+        ApplyStageAmbient();
         RefreshCombatHudTexts();
         UpdateNextButtonState();
     }
@@ -281,9 +285,18 @@ public class GameManager : MonoBehaviour
         return PreparePhaseMode.Normal;
     }
 
+    private void ApplyStageAmbient()
+    {
+        if (stageAmbientLight == null)
+            stageAmbientLight = FindFirstObjectByType<StageAmbientLight>();
+        if (stageAmbientLight != null)
+            stageAmbientLight.Apply(displayedRound);
+    }
+
     private void ShowRound(int round)
     {
         displayedRound = round;
+        ApplyStageAmbient();
         SetRoundTexts(round);
         SetCombatHudActive(true);
     }

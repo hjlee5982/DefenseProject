@@ -168,7 +168,7 @@ public class Projectile : MonoBehaviour
         piercedMonsters.Clear();
         EnsureFlightSpeeds();
         currentMoveSpeed = fullFlightSpeed;
-        FaceToward(target.transform.position);
+        FaceToward(target.AimPosition);
         initialized = true;
         SpawnEffect();
 
@@ -293,7 +293,7 @@ public class Projectile : MonoBehaviour
             Collider2D other = overlapBuffer[i];
             if (other == null) continue;
 
-            Monster monster = other.GetComponent<Monster>();
+            Monster monster = Monster.FromHitCollider(other);
             if (monster != null)
                 TryRockHit(monster);
         }
@@ -370,7 +370,7 @@ public class Projectile : MonoBehaviour
             Collider2D other = overlapBuffer[i];
             if (other == null) continue;
 
-            Monster monster = other.GetComponent<Monster>();
+            Monster monster = Monster.FromHitCollider(other);
             if (monster != null)
                 TryPierceHit(monster);
         }
@@ -413,7 +413,7 @@ public class Projectile : MonoBehaviour
             return;
         }
 
-        FaceToward(target.transform.position);
+        FaceToward(target.AimPosition);
         transform.position += direction * currentMoveSpeed * Time.deltaTime;
 
         if (Vector3.Distance(spawnPosition, transform.position) > range)
@@ -452,7 +452,7 @@ public class Projectile : MonoBehaviour
         {
             if (singleTargetHit) return;
 
-            Monster lingerHit = other.GetComponent<Monster>();
+            Monster lingerHit = Monster.FromHitCollider(other);
             if (lingerHit == null) return;
 
             if (rockRootOnHit)
@@ -464,7 +464,7 @@ public class Projectile : MonoBehaviour
 
         if (freeFlight)
         {
-            Monster pierced = other.GetComponent<Monster>();
+            Monster pierced = Monster.FromHitCollider(other);
             if (pierced == null) return;
 
             if (grimoireMultiHit)
@@ -474,7 +474,7 @@ public class Projectile : MonoBehaviour
             return;
         }
 
-        Monster monster = other.GetComponent<Monster>();
+        Monster monster = Monster.FromHitCollider(other);
         if (monster == null || monster != target) return;
 
         if (grimoireMultiHit)
@@ -574,7 +574,7 @@ public class Projectile : MonoBehaviour
             return;
         }
 
-        FaceToward(target.transform.position);
+        FaceToward(target.AimPosition);
         transform.position += direction * currentMoveSpeed * Time.deltaTime;
 
         if (Vector3.Distance(spawnPosition, transform.position) > range)
@@ -636,7 +636,7 @@ public class Projectile : MonoBehaviour
             Collider2D other = overlapBuffer[i];
             if (other == null) continue;
 
-            Monster monster = other.GetComponent<Monster>();
+            Monster monster = Monster.FromHitCollider(other);
             if (monster == null || monster.IsDead) continue;
 
             BeginGrimoireMultiHit(monster);
@@ -650,6 +650,10 @@ public class Projectile : MonoBehaviour
 
         Collider2D selfCollider = GetComponent<Collider2D>();
         if (selfCollider == null) return false;
+
+        Collider2D focusHitBox = grimoireFocusMonster.HitBox;
+        if (focusHitBox != null)
+            return focusHitBox.enabled && selfCollider.IsTouching(focusHitBox);
 
         Collider2D[] focusColliders = grimoireFocusMonster.GetComponentsInChildren<Collider2D>();
         for (int i = 0; i < focusColliders.Length; i++)

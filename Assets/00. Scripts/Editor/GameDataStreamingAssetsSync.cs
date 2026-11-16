@@ -28,6 +28,27 @@ public sealed class GameDataStreamingAssetsSync : IPreprocessBuildWithReport
         Sync(log: false);
     }
 
+    // 원본 xlsx가 저장되어 다시 임포트되면 복사본도 바로 갱신한다.
+    private sealed class SourceChangeWatcher : AssetPostprocessor
+    {
+        private static void OnPostprocessAllAssets(
+            string[] importedAssets,
+            string[] deletedAssets,
+            string[] movedAssets,
+            string[] movedFromAssetPaths)
+        {
+            const string sourceAssetPath = "Assets/" + SourceRelativePath;
+            for (int i = 0; i < importedAssets.Length; i++)
+            {
+                if (importedAssets[i] != sourceAssetPath) continue;
+
+                // 임포트 콜백 안에서 AssetDatabase.Refresh를 부르지 않도록 다음 에디터 틱으로 미룬다.
+                EditorApplication.delayCall += () => Sync(log: true);
+                return;
+            }
+        }
+    }
+
     [MenuItem("Tools/Sync GameData to StreamingAssets")]
     private static void SyncFromMenu()
     {

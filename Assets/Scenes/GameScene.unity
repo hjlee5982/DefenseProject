@@ -9172,6 +9172,7 @@ GameObject:
   m_Component:
   - component: {fileID: 619394802}
   - component: {fileID: 619394801}
+  - component: {fileID: 619394803}
   m_Layer: 0
   m_Name: Global Light 2D
   m_TagString: Untagged
@@ -9246,6 +9247,31 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &619394803
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 619394800}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80f46be463fb1b549809c46c482073f6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StageAmbientLight
+  phases:
+  - label: "\uC544\uCE68"
+    fromStage: 1
+    color: {r: 1, g: 1, b: 1, a: 1}
+    intensity: 1
+  - label: "\uC624\uD6C4"
+    fromStage: 41
+    color: {r: 1, g: 0.72, b: 0.5, a: 1}
+    intensity: 0.95
+  - label: "\uBC24"
+    fromStage: 71
+    color: {r: 0.28, g: 0.34, b: 0.7, a: 1}
+    intensity: 0.6
 --- !u!1 &633052714
 GameObject:
   m_ObjectHideFlags: 0
@@ -24282,6 +24308,7 @@ MonoBehaviour:
   playerShooter: {fileID: 6982106785543150934}
   roundEventScheduler: {fileID: 1498319672}
   barrier: {fileID: 0}
+  stageAmbientLight: {fileID: 619394803}
   resultPanel: {fileID: 1774778926}
   resultStageText: {fileID: 1831260621}
   resultLevelText: {fileID: 1951063672}
@@ -37438,6 +37465,10 @@ MonoBehaviour:
   monsterPrefabs:
   - {fileID: 7210475841481022055, guid: 6265cce7a9ec093458e432ea3a4c3301, type: 3}
   - {fileID: 7210475841481022055, guid: b91c9614b4cd17d45b70bf67a8db017a, type: 3}
+  - {fileID: 1783988693998977772, guid: 4e01bea48c747944a915abc0afddf1db, type: 3}
+  - {fileID: 1154999913723181113, guid: 5755d26be98ede94d8a4a0a187e08686, type: 3}
+  - {fileID: 7733579916891278804, guid: 919822aa9ea349748b2582d699416f6f, type: 3}
+  - {fileID: 6472184310805696376, guid: d68208a977fcee6478852d49701f7e44, type: 3}
   spawnInterval: 0.3
   spawnXRange: 1.5
   maxSpawnCount: 30

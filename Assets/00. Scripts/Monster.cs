@@ -12,11 +12,16 @@ public class Monster : MonoBehaviour
     [SerializeField] private int attackPower = 10;
     [SerializeField] private int dropGold = 1000;
     [SerializeField] private int dropExp = 10;
+    [Tooltip("체크하면 방벽에 닿는 순간 한 번 타격하고 자폭한다. 해제하면 방벽 앞에서 멈춰 반복 공격한다.")]
+    [SerializeField] private bool selfDestructOnContact = false;
     [SerializeField] private bool castShadow = true;
     [SerializeField] private Vector2 shadowOffset = new Vector2(0f, -0.08f);
     [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
     [SerializeField] private Vector2 shadowScale = Vector2.one;
+    [Tooltip("방벽 감지용 콜라이더. 비어 있으면 하위의 'Detector' 오브젝트를 찾는다.")]
     [SerializeField] private Collider2D barrierDetector;
+    [Tooltip("투사체 피격용 콜라이더. 비어 있으면 하위의 'HitBox' 오브젝트를 찾는다.")]
+    [SerializeField] private Collider2D hitBox;
     [SerializeField] private Image hpGaugeImage;
     [SerializeField] private float hpGaugeTweenDuration = 0.25f;
     [SerializeField] private Color hpGaugeFullColor = new Color(0.82f, 0.95f, 0.48f, 1f);
@@ -26,6 +31,10 @@ public class Monster : MonoBehaviour
 
     public static event Action AnyDestroyed;
     public static event Action<Monster> Killed;
+
+    private const string AttackHitEventName = nameof(OnAttackHit);
+    private static readonly Dictionary<RuntimeAnimatorController, bool> AttackHitEventCache = new();
+    private static readonly HashSet<string> WarnedStrayBodyPrefabs = new();
 
     private static readonly int AttackHash = Animator.StringToHash("Attack");
     private static readonly int MoveHash = Animator.StringToHash("Move");
@@ -46,6 +55,7 @@ public class Monster : MonoBehaviour
     private Barrier attackTargetBarrier;
     private Animator animator;
     private SpriteRenderer bodyRenderer;
+    private bool attackClipHasHitEvent;
     private Material originalSharedMaterial;
     private Material hitFlashMaterial;
     private float displayedHpRatio = 1f;
@@ -70,6 +80,39 @@ public class Monster : MonoBehaviour
     public bool CanBeTargeted =>
         !isDead && hp > 0 && ExpectedRemainingHp > 0 && HasCrossedMinLine;
     public bool IsDead => isDead;
+    public Collider2D HitBox => hitBox;
+
+    /// <summary>투사체가 조준할 위치. 스프라이트/히트박스가 루트에서 떨어져 있어도 피격 판정 중심을 노린다.</summary>
+    public Vector3 AimPosition
+    {
+        get
+        {
+            if (hitBox != null && hitBox.enabled)
+            {
+                Vector3 center = hitBox.bounds.center;
+                center.z = transform.position.z;
+                return center;
+            }
+
+            return transform.position;
+        }
+    }
+
+    /// <summary>
+    /// 투사체가 닿은 콜라이더로부터 몬스터를 찾는다. 하위 오브젝트(HitBox) 콜라이더도 인정하고,
+    /// 방벽 감지용 Detector 콜라이더는 피격으로 치지 않는다.
+    /// </summary>
+    public static Monster FromHitCollider(Collider2D other)
+    {
+        if (other == null) return null;
+
+        Monster monster = other.GetComponentInParent<Monster>();
+        if (monster == null) return null;
+        if (other == monster.barrierDetector) return null;
+        if (monster.hitBox != null && other != monster.hitBox) return null;
+        return monster;
+    }
+
     /// <summary>FieldLayout/MinLine 아래로 내려온 뒤에만 공격 대상이 된다.</summary>
     public bool HasCrossedMinLine =>
         !TryGetMinLineWorldY(out float minLineY) || transform.position.y <= minLineY;
@@ -78,18 +121,12 @@ public class Monster : MonoBehaviour
     {
         ApplyGameData();
         hp = Mathf.Max(1, maxHp);
-        animator = GetComponent<Animator>();
-        bodyRenderer = GetComponent<SpriteRenderer>();
-        if (bodyRenderer != null)
-            originalSharedMaterial = bodyRenderer.sharedMaterial;
+        ResolveVisuals();
+        ResolveColliders();
+        NormalizePhysics();
+        EnsureAnimationEventRelay();
+        attackClipHasHitEvent = HasAttackHitEvent(animator);
         ResolveHpGaugeImage();
-
-        if (barrierDetector == null)
-        {
-            Transform detector = transform.Find("Detector");
-            if (detector != null)
-                barrierDetector = detector.GetComponent<Collider2D>();
-        }
 
         if (transform.position.x > 0f)
         {
@@ -98,11 +135,110 @@ public class Monster : MonoBehaviour
             transform.localScale = scale;
         }
 
-        if (castShadow)
-            SpriteShadow.Attach(gameObject, shadowOffset, shadowColor, shadowScale);
+        if (castShadow && bodyRenderer != null)
+            SpriteShadow.Attach(bodyRenderer.gameObject, shadowOffset, shadowColor, shadowScale);
 
         SyncHpGaugeFillDirection();
         RefreshHpGauge(animate: false);
+    }
+
+    // 프리팹 구조: 루트(Monster, Rigidbody2D) / Animator(SpriteRenderer, Animator) / HitBox, Detector.
+    // 예전처럼 루트에 SpriteRenderer/Animator가 붙은 구조도 그대로 동작한다.
+    private void ResolveVisuals()
+    {
+        animator = GetComponent<Animator>();
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>(true);
+
+        bodyRenderer = animator != null ? animator.GetComponent<SpriteRenderer>() : null;
+        if (bodyRenderer == null)
+            bodyRenderer = GetComponent<SpriteRenderer>();
+        if (bodyRenderer == null)
+            bodyRenderer = GetComponentInChildren<SpriteRenderer>(true);
+
+        if (bodyRenderer != null)
+            originalSharedMaterial = bodyRenderer.sharedMaterial;
+    }
+
+    private void ResolveColliders()
+    {
+        if (barrierDetector == null)
+        {
+            Transform detector = FindChildRecursive(transform, "Detector");
+            if (detector != null)
+                barrierDetector = detector.GetComponent<Collider2D>();
+        }
+
+        if (hitBox == null)
+        {
+            Transform hitBoxTransform = FindChildRecursive(transform, "HitBox");
+            if (hitBoxTransform != null)
+                hitBox = hitBoxTransform.GetComponent<Collider2D>();
+        }
+
+        if (hitBox == null)
+            hitBox = GetComponent<Collider2D>();
+    }
+
+    private void NormalizePhysics()
+    {
+        // 하위 콜라이더는 루트 Rigidbody2D에 붙어야 루트의 OnTriggerEnter2D가 호출된다.
+        // 하위에 별도 Rigidbody2D(특히 Dynamic)가 있으면 중력으로 떨어지고 이벤트도 끊기므로 제거한다.
+        Rigidbody2D[] bodies = GetComponentsInChildren<Rigidbody2D>(true);
+        for (int i = 0; i < bodies.Length; i++)
+        {
+            Rigidbody2D body = bodies[i];
+            if (body == null || body.gameObject == gameObject) continue;
+
+            if (WarnedStrayBodyPrefabs.Add(GetTypeKey()))
+            {
+                Debug.LogWarning(
+                    $"[Monster] '{GetTypeKey()}' prefab has an extra Rigidbody2D on '{body.name}'. " +
+                    "It is removed at runtime; please remove it from the prefab.", this);
+            }
+
+            Destroy(body);
+        }
+
+        // 투사체·방벽 모두 트리거 이벤트로 판정하므로 몬스터 콜라이더는 트리거여야 한다.
+        if (barrierDetector != null)
+            barrierDetector.isTrigger = true;
+        if (hitBox != null)
+            hitBox.isTrigger = true;
+    }
+
+    private void EnsureAnimationEventRelay()
+    {
+        // 애니메이션 이벤트는 Animator가 붙은 오브젝트에만 전달되므로, 하위 Animator면 루트로 중계한다.
+        if (animator == null || animator.gameObject == gameObject) return;
+        if (animator.GetComponent<MonsterAnimationEventRelay>() == null)
+            animator.gameObject.AddComponent<MonsterAnimationEventRelay>();
+    }
+
+    private static bool HasAttackHitEvent(Animator targetAnimator)
+    {
+        RuntimeAnimatorController controller = targetAnimator != null ? targetAnimator.runtimeAnimatorController : null;
+        if (controller == null) return false;
+        if (AttackHitEventCache.TryGetValue(controller, out bool cached)) return cached;
+
+        bool found = false;
+        AnimationClip[] clips = controller.animationClips;
+        for (int i = 0; i < clips.Length && !found; i++)
+        {
+            if (clips[i] == null) continue;
+            AnimationEvent[] events = clips[i].events;
+            for (int e = 0; e < events.Length; e++)
+            {
+                if (events[e].functionName == AttackHitEventName)
+                {
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        AttackHitEventCache[controller] = found;
+        return found;
     }
 
     private void OnDestroy()
@@ -515,10 +651,22 @@ public class Monster : MonoBehaviour
 
         if (barrierDetector != null)
         {
-            if (barrierDetector.IsTouching(other))
+            if (!barrierDetector.IsTouching(other)) return;
+
+            if (selfDestructOnContact)
+                SelfDestructOnBarrier(barrier);
+            else
                 BeginBarrierAttack(barrier);
             return;
         }
+
+        // Detector가 없는 예전 구조의 프리팹은 항상 자폭한다.
+        SelfDestructOnBarrier(barrier);
+    }
+
+    private void SelfDestructOnBarrier(Barrier barrier)
+    {
+        if (isDead || isAttacking) return;
 
         barrier.ApplyContactHit(attackPower);
         BeginContactAttackAndDestroy();
@@ -562,9 +710,8 @@ public class Monster : MonoBehaviour
         if (barrierDetector != null)
             return barrierDetector.IsTouching(barrierCollider);
 
-        Collider2D bodyCollider = GetComponent<Collider2D>();
-        if (bodyCollider != null)
-            return bodyCollider.IsTouching(barrierCollider);
+        if (hitBox != null)
+            return hitBox.IsTouching(barrierCollider);
 
         return false;
     }
@@ -605,6 +752,10 @@ public class Monster : MonoBehaviour
                 CancelBarrierAttack();
                 yield break;
             }
+
+            // 공격 클립에 OnAttackHit 이벤트가 없으면 공격 모션이 끝나는 시점에 타격한다.
+            if (!attackClipHasHitEvent)
+                attackTargetBarrier.ApplyContactHit(attackPower);
 
             animator.Play(MoveHash, 0, 0f);
             yield return WaitForAnimation(MoveHash);
