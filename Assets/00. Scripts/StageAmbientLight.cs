@@ -16,6 +16,8 @@ public class StageAmbientLight : MonoBehaviour
         public int fromStage;
         public Color color;
         [Min(0f)] public float intensity;
+        [Tooltip("체크하면 이 구간에서는 밤 BGM(BGM2)이 나온다. 해제하면 BGM1.")]
+        public bool nightBgm;
     }
 
     // 스테이지 번호가 큰 구간이 우선한다. 순서는 상관없다.
@@ -24,7 +26,7 @@ public class StageAmbientLight : MonoBehaviour
     {
         new Phase { label = "아침",  fromStage = 1,  color = Color.white,                        intensity = 1f },
         new Phase { label = "오후",  fromStage = 41, color = new Color(1f, 0.72f, 0.5f, 1f),     intensity = 0.95f },
-        new Phase { label = "밤",    fromStage = 71, color = new Color(0.28f, 0.34f, 0.7f, 1f),  intensity = 0.6f },
+        new Phase { label = "밤",    fromStage = 71, color = new Color(0.28f, 0.34f, 0.7f, 1f),  intensity = 0.6f, nightBgm = true },
     };
 
     private Light2D globalLight;
@@ -34,11 +36,29 @@ public class StageAmbientLight : MonoBehaviour
         globalLight = GetComponent<Light2D>();
     }
 
+    /// <summary>해당 스테이지가 밤 BGM을 쓰는 구간이면 true.</summary>
+    public bool IsNightBgm(int stageNumber)
+    {
+        int index = FindPhaseIndex(stageNumber);
+        return index >= 0 && phases[index].nightBgm;
+    }
+
     public void Apply(int stageNumber)
     {
         if (globalLight == null)
             globalLight = GetComponent<Light2D>();
-        if (globalLight == null || phases == null || phases.Length == 0) return;
+        if (globalLight == null) return;
+
+        int best = FindPhaseIndex(stageNumber);
+        if (best < 0) return;
+
+        globalLight.color = phases[best].color;
+        globalLight.intensity = phases[best].intensity;
+    }
+
+    private int FindPhaseIndex(int stageNumber)
+    {
+        if (phases == null || phases.Length == 0) return -1;
 
         int best = -1;
         for (int i = 0; i < phases.Length; i++)
@@ -59,7 +79,6 @@ public class StageAmbientLight : MonoBehaviour
             }
         }
 
-        globalLight.color = phases[best].color;
-        globalLight.intensity = phases[best].intensity;
+        return best;
     }
 }

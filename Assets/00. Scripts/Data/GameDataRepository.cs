@@ -301,8 +301,22 @@ public static class GameDataRepository
         langs[lang] = cleaned;
     }
 
+#if UNITY_EDITOR
+    /// <summary>에디터 전용: 밸런스 테스트 등에서 임시 엑셀 파일을 대신 읽을 때 쓰는 경로. 비어 있으면 무시한다.</summary>
+    public static string EditorOverridePath;
+#endif
+
     private static bool TryLoadWorkbookBytes(out byte[] workbookBytes, out string sourceLabel)
     {
+#if UNITY_EDITOR
+        if (!string.IsNullOrEmpty(EditorOverridePath) && File.Exists(EditorOverridePath))
+        {
+            workbookBytes = File.ReadAllBytes(EditorOverridePath);
+            sourceLabel = EditorOverridePath;
+            return true;
+        }
+#endif
+
         // Android/iOS cannot File.Open StreamingAssets (jar/apk). Prefer Resources.
         TextAsset embedded = Resources.Load<TextAsset>("GameData");
         if (embedded != null && embedded.bytes != null && embedded.bytes.Length > 0)

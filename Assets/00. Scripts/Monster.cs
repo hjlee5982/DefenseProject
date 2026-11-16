@@ -29,6 +29,25 @@ public class Monster : MonoBehaviour
     [SerializeField] private int hitFlashCount = 3;
     [SerializeField] private float hitFlashInterval = 0.08f;
 
+    [Header("Ranged Attack")]
+    [Tooltip("체크하면 방벽에 닿지 않고, 일정 거리까지 접근하면 멈춰서 투사체를 쏜다. 근접 공격과 자폭은 하지 않는다.")]
+    [SerializeField] private bool rangedAttack = false;
+    [Tooltip("체크하면 플레이어가 장착한 무기 중 가장 긴 사거리 위치까지 다가와서 멈추고 공격한다(플레이어가 조준할 수 있는 거리). 장착한 무기가 없을 때는 아래 고정 거리를 쓴다.")]
+    [SerializeField] private bool stopAtPlayerMaxRange = true;
+    [Tooltip("방벽 윗면에서 이 거리(월드 단위)까지 다가오면 멈추고 공격을 시작한다. 위 옵션을 끄거나 장착한 무기가 없을 때만 쓰인다.")]
+    [SerializeField] private float rangedAttackRange = 2f;
+    [Tooltip("공격 모션이 끝난 뒤 다음 공격까지 기다리는 시간(초).")]
+    [SerializeField] private float rangedAttackInterval = 0.8f;
+    [SerializeField] private MonsterProjectile projectilePrefab;
+    [Tooltip("투사체가 나가는 위치. 비어 있으면 하위의 'Muzzle' 오브젝트를, 그것도 없으면 히트박스 중심을 쓴다.")]
+    [SerializeField] private Transform muzzle;
+
+    [Header("Death")]
+    [Tooltip("죽을 때(처치되거나 자폭할 때) 그 자리에 생성할 이펙트. 비어 있으면 아무 이펙트 없이 사라진다.")]
+    [SerializeField] private GameObject deathEffectPrefab;
+    [Tooltip("이펙트 크기 배율. 몬스터 크기에 맞게 조절한다.")]
+    [SerializeField] private float deathEffectScale = 1f;
+
     public static event Action AnyDestroyed;
     public static event Action<Monster> Killed;
 
@@ -178,6 +197,9 @@ public class Monster : MonoBehaviour
 
         if (hitBox == null)
             hitBox = GetComponent<Collider2D>();
+
+        if (muzzle == null)
+            muzzle = FindChildRecursive(transform, "Muzzle");
     }
 
     private void NormalizePhysics()
@@ -284,6 +306,12 @@ public class Monster : MonoBehaviour
         if (isAttacking)
         {
             ValidateBarrierAttackRange();
+            return;
+        }
+
+        if (rangedAttack && IsInRangedAttackPosition())
+        {
+            BeginRangedAttack();
             return;
         }
 
@@ -635,7 +663,20 @@ public class Monster : MonoBehaviour
     private void FinalizeDeath()
     {
         waitingHitFlashBeforeDestroy = false;
+        SpawnDeathEffect();
         Destroy(gameObject);
+    }
+
+    private void SpawnDeathEffect()
+    {
+        if (deathEffectPrefab == null) return;
+
+        // 콜라이더는 이미 꺼졌으므로 스프라이트 중심에 생성한다.
+        Vector3 position = bodyRenderer != null ? bodyRenderer.bounds.center : transform.position;
+        position.z = transform.position.z;
+
+        GameObject effect = Instantiate(deathEffectPrefab, position, Quaternion.identity);
+        effect.transform.localScale *= deathEffectScale;
     }
 
     private void Die(bool killed)
@@ -646,6 +687,9 @@ public class Monster : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        // 원거리 몬스터는 접촉 공격/자폭을 하지 않는다.
+        if (rangedAttack) return;
+
         Barrier barrier = other.GetComponent<Barrier>();
         if (barrier == null) return;
 
@@ -675,9 +719,92 @@ public class Monster : MonoBehaviour
     // Bat_Attack Animation Event
     public void OnAttackHit()
     {
-        if (isDead || attackTargetBarrier == null) return;
+        if (isDead) return;
+
+        if (rangedAttack)
+        {
+            FireRangedProjectile();
+            return;
+        }
+
+        if (attackTargetBarrier == null) return;
         if (!IsInBarrierAttackRange()) return;
         attackTargetBarrier.ApplyContactHit(attackPower);
+    }
+
+    private const float RangedBarrierStopMargin = 0.1f;
+    private static PlayerShooter cachedPlayerShooter;
+
+    private bool IsInRangedAttackPosition()
+    {
+        bool hasBarrier = TryGetBarrierTopY(out float barrierTopY);
+        float bottomY = hitBox != null && hitBox.enabled
+            ? hitBox.bounds.min.y
+            : transform.position.y;
+
+        // 사거리가 짧아도 방벽을 뚫고 지나가지 않도록, 방벽에 닿기 직전에는 무조건 멈춘다.
+        if (hasBarrier && bottomY - barrierTopY <= RangedBarrierStopMargin)
+            return true;
+
+        if (stopAtPlayerMaxRange)
+        {
+            if (cachedPlayerShooter == null)
+                cachedPlayerShooter = FindAnyObjectByType<PlayerShooter>();
+
+            float maxRange = cachedPlayerShooter != null ? cachedPlayerShooter.MaxWeaponRange : 0f;
+            if (maxRange > 0f)
+            {
+                // 플레이어는 MinLine을 넘은 몬스터만 조준하므로, 그 전에는 멈추지 않는다.
+                if (!HasCrossedMinLine) return false;
+
+                // PlayerShooter의 사거리 판정과 같은 기준(플레이어 ↔ 몬스터 루트 거리)을 쓴다.
+                return Vector2.Distance(cachedPlayerShooter.transform.position, transform.position) <= maxRange;
+            }
+        }
+
+        return hasBarrier && bottomY - barrierTopY <= rangedAttackRange;
+    }
+
+    private void BeginRangedAttack()
+    {
+        if (isDead || isAttacking) return;
+
+        isAttacking = true;
+        if (barrierAttackRoutine != null)
+            StopCoroutine(barrierAttackRoutine);
+        barrierAttackRoutine = StartCoroutine(RangedAttackLoop());
+    }
+
+    private IEnumerator RangedAttackLoop()
+    {
+        while (!isDead && isAttacking)
+        {
+            if (animator != null)
+                animator.Play(AttackHash, 0, 0f);
+            yield return WaitForAnimation(AttackHash);
+
+            if (isDead || !isAttacking) yield break;
+
+            // 공격 클립에 OnAttackHit 이벤트가 없으면 공격 모션이 끝나는 시점에 발사한다.
+            if (!attackClipHasHitEvent)
+                FireRangedProjectile();
+
+            if (animator != null)
+                animator.Play(MoveHash, 0, 0f);
+            yield return new WaitForSeconds(rangedAttackInterval);
+        }
+    }
+
+    private void FireRangedProjectile()
+    {
+        if (isDead || projectilePrefab == null) return;
+
+        Barrier barrier = cachedBarrier != null ? cachedBarrier : FindAnyObjectByType<Barrier>();
+        if (barrier == null) return;
+
+        Vector3 origin = muzzle != null ? muzzle.position : AimPosition;
+        MonsterProjectile projectile = Instantiate(projectilePrefab, origin, Quaternion.identity);
+        projectile.Launch(barrier, attackPower);
     }
 
     private void BeginBarrierAttack(Barrier barrier)

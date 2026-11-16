@@ -4,7 +4,6 @@ using System.Globalization;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
@@ -291,6 +290,10 @@ public class GameManager : MonoBehaviour
             stageAmbientLight = FindFirstObjectByType<StageAmbientLight>();
         if (stageAmbientLight != null)
             stageAmbientLight.Apply(displayedRound);
+
+        // 시간대가 밤인 구간부터 BGM2, 그 전(게임 시작 포함)은 BGM1.
+        bool night = stageAmbientLight != null && stageAmbientLight.IsNightBgm(displayedRound);
+        BgmPlayer.SetTrack(night ? 1 : 0);
     }
 
     private void ShowRound(int round)
@@ -629,7 +632,7 @@ public class GameManager : MonoBehaviour
                 inventoryManager?.AddItemRemoveCount(ParseEffectAmount(effect.Value, 1));
                 break;
             case "RepairBarrier":
-                ResolveBarrier()?.RestoreFullHp();
+                ResolveBarrier()?.RestoreHalfOfLostHp();
                 break;
             default:
                 EnhanceBonuses.ApplyEffect(effect.EffectType, ParseEffectFloat(effect.Value));
@@ -701,16 +704,22 @@ public class GameManager : MonoBehaviour
 
     private void OnBarrierHpDepleted()
     {
-        EndRun();
+        EndRun(cleared: false);
     }
 
     /// <summary>
     /// 배리어 파괴 또는 최종 스테이지 클리어 시 공통 게임오버(결과창) 처리.
     /// </summary>
-    private void EndRun()
+    private void EndRun(bool cleared)
     {
         if (isGameOver) return;
         isGameOver = true;
+
+        BgmPlayer.Stop();
+        if (cleared)
+            GameSfx.PlayClear();
+        else
+            GameSfx.PlayGameOver();
 
         inCombat = false;
         pendingReturnToPrepare = false;
@@ -731,7 +740,7 @@ public class GameManager : MonoBehaviour
     {
         if (displayedRound >= FinalStageNumber)
         {
-            EndRun();
+            EndRun(cleared: true);
             return;
         }
 
@@ -774,7 +783,7 @@ public class GameManager : MonoBehaviour
     {
         SetSimulationPaused(false);
         RestoreDesiredTimeScale(forceOne: true);
-        SceneManager.LoadScene(titleSceneName);
+        SceneFader.Load(titleSceneName);
     }
 
     private static int ParseEffectAmount(string value, int defaultAmount)
@@ -940,6 +949,12 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < projectiles.Length; i++)
         {
             Destroy(projectiles[i].gameObject);
+        }
+
+        MonsterProjectile[] monsterProjectiles = FindObjectsByType<MonsterProjectile>(FindObjectsSortMode.None);
+        for (int i = 0; i < monsterProjectiles.Length; i++)
+        {
+            Destroy(monsterProjectiles[i].gameObject);
         }
     }
 }

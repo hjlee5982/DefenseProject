@@ -953,6 +953,7 @@ public class InventoryManager : MonoBehaviour
         }
 
         target.UpgradeGrade();
+        GameSfx.PlayMerge(target.Grade);
         Destroy(source.gameObject);
         return true;
     }

@@ -137,7 +137,9 @@ public class BalanceProbe : MonoBehaviour
         objectsRoot.gameObject.SetActive(true);
         yield return null;
 
-        SetField(barrier, "hp", 1000000);
+        // 시나리오마다 방벽 HP를 다시 채운다(이전에는 존재하지 않는 "hp" 필드를 지정해서 피해가 시나리오 간에 누적됐다).
+        SetField(barrier, "coreHp", 1000000);
+        SetField(barrier, "bufferHp", 0);
         spawned = destroyed = killed = 0;
         goldSum = expSum = 0;
 

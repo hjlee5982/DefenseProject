@@ -2752,6 +2752,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 187806248}
   m_CullTransparentMesh: 1
+--- !u!1 &209529269
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 209529271}
+  - component: {fileID: 209529270}
+  m_Layer: 0
+  m_Name: BgmPlayer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &209529270
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 209529269}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ecc88e275dd1da240b9246c8d5a88be0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BgmPlayer
+  tracks:
+  - {fileID: 8300000, guid: 930914ac83eccdb4db6fce783be0cd84, type: 3}
+  - {fileID: 8300000, guid: 2dd4b16f00c3c2d4994bba90e950a1c1, type: 3}
+  volume: 0.6
+  fadeSeconds: 0.8
+--- !u!4 &209529271
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 209529269}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &211197647
 GameObject:
   m_ObjectHideFlags: 0
@@ -9264,14 +9313,17 @@ MonoBehaviour:
     fromStage: 1
     color: {r: 1, g: 1, b: 1, a: 1}
     intensity: 1
+    nightBgm: 0
   - label: "\uC624\uD6C4"
     fromStage: 41
     color: {r: 1, g: 0.72, b: 0.5, a: 1}
     intensity: 0.95
+    nightBgm: 0
   - label: "\uBC24"
     fromStage: 71
     color: {r: 0.28, g: 0.34, b: 0.7, a: 1}
     intensity: 0.6
+    nightBgm: 1
 --- !u!1 &633052714
 GameObject:
   m_ObjectHideFlags: 0
@@ -9309,6 +9361,64 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 105}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &634809207
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 634809209}
+  - component: {fileID: 634809208}
+  m_Layer: 0
+  m_Name: GameSfx
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &634809208
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 634809207}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f1dccb63dd558a49b5264c050409495, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameSfx
+  pick: {fileID: 8300000, guid: 77c0d86322780714097329f9187d874c, type: 3}
+  pickVolume: 1
+  minPickInterval: 0.05
+  drop: {fileID: 8300000, guid: 81a0bbbb691ee4048b6f9d4425a35b7b, type: 3}
+  dropVolume: 1
+  minDropInterval: 0.05
+  merge1: {fileID: 8300000, guid: b29e719a48f0c1041b32dd04668d59a7, type: 3}
+  merge2: {fileID: 8300000, guid: c44f9851d69637349b243f52e9a8e04b, type: 3}
+  merge3: {fileID: 8300000, guid: 24433b42dfc7ba44d9db7f2eb9b4a25e, type: 3}
+  mergeVolume: 0.7
+  gameOver: {fileID: 8300000, guid: 511c9227deb383e43ac87c3c89cf7614, type: 3}
+  clear: {fileID: 8300000, guid: bc478767ec0ac6b498e85f687d716dbe, type: 3}
+  resultVolume: 1
+  voiceCount: 6
+--- !u!4 &634809209
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 634809207}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &638510529
 GameObject:
   m_ObjectHideFlags: 0
@@ -37469,6 +37579,7 @@ MonoBehaviour:
   - {fileID: 1154999913723181113, guid: 5755d26be98ede94d8a4a0a187e08686, type: 3}
   - {fileID: 7733579916891278804, guid: 919822aa9ea349748b2582d699416f6f, type: 3}
   - {fileID: 6472184310805696376, guid: d68208a977fcee6478852d49701f7e44, type: 3}
+  - {fileID: 6472184310805696376, guid: 0247eba74d136d840a69b5d035941d08, type: 3}
   spawnInterval: 0.3
   spawnXRange: 1.5
   maxSpawnCount: 30
@@ -37666,3 +37777,5 @@ SceneRoots:
   - {fileID: 1498319670}
   - {fileID: 1312971656}
   - {fileID: 777659424}
+  - {fileID: 209529271}
+  - {fileID: 634809209}

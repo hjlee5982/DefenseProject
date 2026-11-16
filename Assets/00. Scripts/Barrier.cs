@@ -119,6 +119,22 @@ public class Barrier : MonoBehaviour
         RefreshVisuals(animateGauge: true);
     }
 
+    /// <summary>잃은 체력의 절반을 회복한다(홀수면 올림). 보호막(버퍼) 쪽을 먼저 채운다.</summary>
+    public void RestoreHalfOfLostHp()
+    {
+        int lost = (coreMaxHp + bufferMaxHp) - (coreHp + bufferHp);
+        if (lost <= 0) return;
+
+        int heal = Mathf.CeilToInt(lost * 0.5f);
+
+        int bufferHeal = Mathf.Min(heal, bufferMaxHp - bufferHp);
+        bufferHp += bufferHeal;
+        heal -= bufferHeal;
+
+        coreHp = Mathf.Min(coreMaxHp, coreHp + heal);
+        RefreshVisuals(animateGauge: true);
+    }
+
     private void RefreshVisuals(bool animateGauge)
     {
         RefreshGauge(animateGauge);

@@ -29,6 +29,24 @@ public class PlayerShooter : MonoBehaviour
 
     private Vector3 FireOrigin => firePoint != null ? firePoint.position : transform.position;
 
+    /// <summary>현재 장착한 무기 중 가장 긴 사거리. 장착한 무기가 없으면 0.</summary>
+    public float MaxWeaponRange
+    {
+        get
+        {
+            if (weapons == null) return 0f;
+
+            float max = 0f;
+            for (int i = 0; i < weapons.Length; i++)
+            {
+                if (weapons[i].range > max)
+                    max = weapons[i].range;
+            }
+
+            return max;
+        }
+    }
+
     private void Awake()
     {
         animator = GetComponent<Animator>();

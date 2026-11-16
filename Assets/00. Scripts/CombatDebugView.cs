@@ -71,7 +71,7 @@ public class CombatDebugView : MonoBehaviour
 
         label.fontSize = fontSize;
         label.richText = true;
-        label.enableWordWrapping = false;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
     }
 
     private void Refresh()

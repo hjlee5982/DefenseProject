@@ -171,6 +171,7 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        GameSfx.PlayPick();
         isDragging = true;
         dragScreenLift = IsTouchPointer(eventData)
             ? new Vector2(0f, Screen.height * touchDragLiftRatio)
@@ -245,6 +246,9 @@ public class Item : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         }
 
         inventoryManager.ClearPreview();
+
+        // 합성은 위에서 따로 처리(합성음)하므로, 놓았을 때와 제자리로 되돌아갈 때만 내려놓는 소리를 낸다.
+        GameSfx.PlayDrop();
 
         if (!placed)
         {

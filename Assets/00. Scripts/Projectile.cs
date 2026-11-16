@@ -281,11 +281,7 @@ public class Projectile : MonoBehaviour
         if (myCollider == null) return;
 
         overlapBuffer.Clear();
-        ContactFilter2D filter = new ContactFilter2D
-        {
-            useTriggers = true
-        };
-        filter.NoFilter();
+        ContactFilter2D filter = ContactFilter2D.noFilter;
         Physics2D.OverlapCollider(myCollider, filter, overlapBuffer);
 
         for (int i = 0; i < overlapBuffer.Count; i++)
@@ -358,11 +354,7 @@ public class Projectile : MonoBehaviour
         if (myCollider == null) return;
 
         overlapBuffer.Clear();
-        ContactFilter2D filter = new ContactFilter2D
-        {
-            useTriggers = true
-        };
-        filter.NoFilter();
+        ContactFilter2D filter = ContactFilter2D.noFilter;
         Physics2D.OverlapCollider(myCollider, filter, overlapBuffer);
 
         for (int i = 0; i < overlapBuffer.Count; i++)
@@ -627,8 +619,7 @@ public class Projectile : MonoBehaviour
         if (selfCollider == null) return;
 
         overlapBuffer.Clear();
-        ContactFilter2D filter = new ContactFilter2D { useTriggers = true };
-        filter.NoFilter();
+        ContactFilter2D filter = ContactFilter2D.noFilter;
         Physics2D.OverlapCollider(selfCollider, filter, overlapBuffer);
 
         for (int i = 0; i < overlapBuffer.Count; i++)

@@ -167,6 +167,14 @@ MonoBehaviour:
   hpGaugeEmptyColor: {r: 1, g: 0.42, b: 0.42, a: 1}
   hitFlashCount: 3
   hitFlashInterval: 0.08
+  rangedAttack: 0
+  stopAtPlayerMaxRange: 1
+  rangedAttackRange: 2
+  rangedAttackInterval: 0.8
+  projectilePrefab: {fileID: 0}
+  muzzle: {fileID: 0}
+  deathEffectPrefab: {fileID: 15355463253945848, guid: a1c41974712805f41a0ace8d18a116b0, type: 3}
+  deathEffectScale: 1
 --- !u!50 &3959353105467664432
 Rigidbody2D:
   serializedVersion: 5

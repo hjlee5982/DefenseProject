@@ -73,3 +73,19 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Local MCP config (machine-specific paths)
+.mcp.json
+
+# Excel lock files (GameData.xlsx open in Excel)
+~$*
+
+# Local Android build probe output
+/_AndroidBuildProbe/
+
+# Per-user Unity AI Assistant settings (changes on every editor session)
+/ProjectSettings/Packages/com.unity.ai.assistant/
+
+# Editor/IDE leftovers
+.vs/
+*.vsconfig.user

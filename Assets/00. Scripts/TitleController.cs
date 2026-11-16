@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class TitleController : MonoBehaviour
@@ -14,6 +13,6 @@ public class TitleController : MonoBehaviour
 
     private void LoadGameScene()
     {
-        SceneManager.LoadScene(gameSceneName);
+        SceneFader.Load(gameSceneName);
     }
 }
