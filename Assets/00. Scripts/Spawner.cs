@@ -10,11 +10,22 @@ public class Spawner : MonoBehaviour
     [SerializeField] private float spawnXRange = 1.5f;
     [SerializeField] private int maxSpawnCount = 10;
 
+    [Header("Burst Spawn (스테이지 모드)")]
+    [Tooltip("한 번에 동시에 생성하는 최소 마릿수")]
+    [SerializeField] private int minBurstCount = 1;
+    [Tooltip("한 번에 동시에 생성하는 최대 마릿수")]
+    [SerializeField] private int maxBurstCount = 5;
+    [Tooltip("켜면 다음 생성 대기 시간을 묶음 마릿수만큼 늘려 초당 생성 수를 기존과 같게 유지한다. 끄면 묶음마다 기본 간격만 기다린다(더 빡빡해짐).")]
+    [SerializeField] private bool scaleIntervalByBurstSize = true;
+    [Tooltip("같은 묶음 안에서 몬스터끼리 유지하려는 최소 X 간격")]
+    [SerializeField] private float burstMinSpacing = 0.45f;
+
     private float spawnTimer;
     private int spawnedCount;
     private int plannedSpawnCount;
     private float activeSpawnInterval;
     private int pendingStageOrder;
+    private int lastBurstSize = 1;
     private readonly Queue<StageSpawnEntry> spawnQueue = new();
 
     public bool HasFinishedSpawning =>
@@ -34,6 +45,7 @@ public class Spawner : MonoBehaviour
         plannedSpawnCount = 0;
         spawnQueue.Clear();
         activeSpawnInterval = spawnInterval;
+        lastBurstSize = 1;
 
         if (!debugMode)
             BuildStageSpawnQueue(pendingStageOrder);
@@ -65,19 +77,31 @@ public class Spawner : MonoBehaviour
     {
         if (spawnQueue.Count == 0) return;
 
+        // 옵션이 켜져 있으면 묶음 크기만큼 대기 시간을 늘려, 전체 생성 속도(마리/초)를 기존과 같게 유지한다.
         spawnTimer += Time.deltaTime;
-        if (spawnTimer < activeSpawnInterval) return;
+        float wait = scaleIntervalByBurstSize ? activeSpawnInterval * lastBurstSize : activeSpawnInterval;
+        if (spawnTimer < wait) return;
 
         spawnTimer = 0f;
-        StageSpawnEntry entry = spawnQueue.Dequeue();
-        Monster prefab = ResolveMonsterPrefab(entry.MonsterId);
-        if (prefab == null)
-        {
-            plannedSpawnCount = Mathf.Max(0, plannedSpawnCount - 1);
-            return;
-        }
 
-        SpawnPrefab(prefab, entry);
+        int minBurst = Mathf.Max(1, minBurstCount);
+        int maxBurst = Mathf.Max(minBurst, maxBurstCount);
+        int burst = Mathf.Min(UnityEngine.Random.Range(minBurst, maxBurst + 1), spawnQueue.Count);
+        lastBurstSize = Mathf.Max(1, burst);
+
+        var usedOffsets = new List<float>(burst);
+        for (int i = 0; i < burst; i++)
+        {
+            StageSpawnEntry entry = spawnQueue.Dequeue();
+            Monster prefab = ResolveMonsterPrefab(entry.MonsterId);
+            if (prefab == null)
+            {
+                plannedSpawnCount = Mathf.Max(0, plannedSpawnCount - 1);
+                continue;
+            }
+
+            SpawnPrefab(prefab, entry, usedOffsets);
+        }
     }
 
     private void BuildStageSpawnQueue(int stageOrder)
@@ -106,12 +130,14 @@ public class Spawner : MonoBehaviour
         plannedSpawnCount = spawnQueue.Count;
     }
 
-    private void SpawnPrefab(Monster prefab, StageSpawnEntry entry = null)
+    private void SpawnPrefab(Monster prefab, StageSpawnEntry entry = null, List<float> usedOffsets = null)
     {
         if (prefab == null) return;
 
         Vector3 position = transform.position;
-        position.x += SampleSpawnXOffset();
+        float offset = SampleSpawnXOffset(usedOffsets);
+        usedOffsets?.Add(offset);
+        position.x += offset;
         Monster spawned = Instantiate(prefab, position, Quaternion.identity);
         if (entry != null)
             spawned.ApplyStageOverride(entry.Hp, entry.Atk, entry.Gold, entry.Exp);
@@ -174,19 +200,41 @@ public class Spawner : MonoBehaviour
         return null;
     }
 
-    private float SampleSpawnXOffset()
+    private float SampleSpawnXOffset(List<float> usedOffsets = null)
     {
         const float deadZone = 0.0001f;
         float spawnerX = transform.position.x;
+        float lastValid = float.NaN;
 
-        for (int i = 0; i < 16; i++)
+        // 같은 묶음의 몬스터와 겹치지 않도록 간격을 확보하며 뽑는다(여의치 않으면 마지막 후보 사용).
+        for (int i = 0; i < 24; i++)
         {
             float offset = UnityEngine.Random.Range(-spawnXRange, spawnXRange);
-            if (Mathf.Abs(spawnerX + offset) > deadZone)
+            if (Mathf.Abs(spawnerX + offset) <= deadZone)
+                continue;
+
+            lastValid = offset;
+            if (IsSpacedFrom(offset, usedOffsets))
                 return offset;
         }
 
+        if (!float.IsNaN(lastValid))
+            return lastValid;
+
         float fallback = Mathf.Max(spawnXRange * 0.25f, 0.1f);
         return spawnerX >= 0f ? -fallback : fallback;
+    }
+
+    private bool IsSpacedFrom(float offset, List<float> usedOffsets)
+    {
+        if (usedOffsets == null) return true;
+
+        for (int i = 0; i < usedOffsets.Count; i++)
+        {
+            if (Mathf.Abs(usedOffsets[i] - offset) < burstMinSpacing)
+                return false;
+        }
+
+        return true;
     }
 }

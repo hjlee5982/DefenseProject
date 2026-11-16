@@ -4233,11 +4233,11 @@ MonoBehaviour:
     spawnEnabled: 1
   - prefab: {fileID: 7421000495332981184, guid: 72316ea37dd3ec94c80e4ed896f29758, type: 3}
     spawnEnabled: 1
-  grade1Chance: 90.42
-  grade2Chance: 7.8
-  grade3Chance: 1.16
-  grade4Chance: 0.5
-  grade5Chance: 0.12
+  grade1Chance: 95
+  grade2Chance: 4
+  grade3Chance: 0.7
+  grade4Chance: 0.25
+  grade5Chance: 0.05
 --- !u!1 &315188716
 GameObject:
   m_ObjectHideFlags: 0
@@ -37583,6 +37583,10 @@ MonoBehaviour:
   spawnInterval: 0.3
   spawnXRange: 1.5
   maxSpawnCount: 30
+  minBurstCount: 1
+  maxBurstCount: 5
+  scaleIntervalByBurstSize: 1
+  burstMinSpacing: 0.45
 --- !u!114 &6421319682479255897
 MonoBehaviour:
   m_ObjectHideFlags: 0

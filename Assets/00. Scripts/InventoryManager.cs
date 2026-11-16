@@ -48,15 +48,15 @@ public class InventoryManager : MonoBehaviour
 
     [Header("Shop Grade Probabilities (합계 100%)")]
     [Tooltip("1단계 아이템이 등장할 확률 (%)")]
-    [SerializeField] private float grade1Chance = 70f;
+    [SerializeField] private float grade1Chance = 95f;
     [Tooltip("2단계 아이템이 등장할 확률 (%)")]
-    [SerializeField] private float grade2Chance = 20f;
+    [SerializeField] private float grade2Chance = 4f;
     [Tooltip("3단계 아이템이 등장할 확률 (%)")]
-    [SerializeField] private float grade3Chance = 7f;
+    [SerializeField] private float grade3Chance = 0.6f;
     [Tooltip("4단계 아이템이 등장할 확률 (%)")]
-    [SerializeField] private float grade4Chance = 2f;
+    [SerializeField] private float grade4Chance = 0.25f;
     [Tooltip("5단계 아이템이 등장할 확률 (%)")]
-    [SerializeField] private float grade5Chance = 1f;
+    [SerializeField] private float grade5Chance = 0.15f;
 
     private RectTransform[] shopSlots;
     private RectTransform[] clearSlots;

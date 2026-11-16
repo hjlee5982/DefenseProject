@@ -207,7 +207,8 @@ public static class TitleEnhanceProgress
 
     /// <summary>
     /// 상점 등급 가중치에 생산성 보너스를 적용한다.
-    /// 3~5등급 합계 +P, 1~2등급에서 각각 P/2 감소. 총합은 유지된다.
+    /// 생산성 레벨 비율 t(= 현재 레벨 / 최대 레벨)만큼 3~5등급 확률이 (1 + t)배가 되고,
+    /// 1등급은 늘어난 양의 8배만큼 줄고, 그 차이(7배)는 2등급이 가져간다. 총합은 유지된다. (MAX일 때 3~5등급 +100%)
     /// </summary>
     public static float[] ApplyProductivityToGradeWeights(float[] source)
     {
@@ -218,38 +219,26 @@ public static class TitleEnhanceProgress
         for (int i = 0; i < source.Length; i++)
             chances[i] = Mathf.Max(0f, source[i]);
 
-        float bonus = CurrentProductivityPercent;
-        if (bonus <= 0f)
+        int maxLevel = GetMaxLevel(ProductivityId);
+        if (maxLevel <= 0)
             return chances;
 
-        float highAdd = bonus / 3f;
-        float lowSub = bonus / 2f;
+        float t = Mathf.Clamp01(GetLevel(ProductivityId) / (float)maxLevel);
+        if (t <= 0f)
+            return chances;
 
-        chances[0] -= lowSub;
-        chances[1] -= lowSub;
-        chances[2] += highAdd;
-        chances[3] += highAdd;
-        chances[4] += highAdd;
-
-        for (int i = 0; i < 2; i++)
+        float added = 0f;
+        for (int i = 2; i < 5; i++)
         {
-            if (chances[i] >= 0f)
-                continue;
-
-            float deficit = -chances[i];
-            chances[i] = 0f;
-
-            float highTotal = chances[2] + chances[3] + chances[4];
-            if (highTotal <= 0f)
-                continue;
-
-            for (int h = 2; h < 5; h++)
-            {
-                float share = chances[h] / highTotal;
-                chances[h] = Mathf.Max(0f, chances[h] - deficit * share);
-            }
+            float increase = chances[i] * t;
+            chances[i] += increase;
+            added += increase;
         }
 
+        // 1등급은 늘어난 양의 8배만큼 줄이고, 늘어난 양을 뺀 차이(7배)는 2등급에 더한다.
+        float lowShift = Mathf.Min(chances[0], added * 8f);
+        chances[0] -= lowShift;
+        chances[1] += lowShift - Mathf.Min(lowShift, added);
         return chances;
     }
 }
